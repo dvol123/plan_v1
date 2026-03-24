@@ -1,5 +1,7 @@
 package com.plan.app.presentation.ui.main
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -25,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -54,6 +57,26 @@ fun MainScreen(
     var selectedPhotoUri by remember { mutableStateOf<Uri?>(null) }
     var fullscreenPhotoUri by remember { mutableStateOf<String?>(null) }
     var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
+    var showCameraPermissionDenied by remember { mutableStateOf(false) }
+    
+    // Camera permission launcher
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            // Permission granted, launch camera
+            val tempFile = File(context.cacheDir, "camera_${System.currentTimeMillis()}.jpg")
+            cameraImageUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                tempFile
+            )
+            cameraImageUri?.let { cameraLauncher.launch(it) }
+        } else {
+            // Permission denied
+            showCameraPermissionDenied = true
+        }
+    }
     
     // Photo picker launcher
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -82,6 +105,20 @@ fun MainScreen(
         } else {
             projects.filter { it.name.contains(uiState.searchQuery, ignoreCase = true) }
         }
+    }
+    
+    // Camera permission denied dialog
+    if (showCameraPermissionDenied) {
+        AlertDialog(
+            onDismissRequest = { showCameraPermissionDenied = false },
+            title = { Text(stringResource(R.string.permission_required)) },
+            text = { Text(stringResource(R.string.camera_permission_denied)) },
+            confirmButton = {
+                TextButton(onClick = { showCameraPermissionDenied = false }) {
+                    Text(stringResource(R.string.ok))
+                }
+            }
+        )
     }
     
     Scaffold(
@@ -186,15 +223,23 @@ fun MainScreen(
                         DropdownMenuItem(
                             onClick = {
                                 showAddMenu = false
-                                // Create temp file for camera image
-                                val tempFile = File(context.cacheDir, "camera_${System.currentTimeMillis()}.jpg")
-                                // Use FileProvider for Android 7.0+ compatibility
-                                cameraImageUri = FileProvider.getUriForFile(
-                                    context,
-                                    "${context.packageName}.fileprovider",
-                                    tempFile
-                                )
-                                cameraLauncher.launch(cameraImageUri)
+                                // Check camera permission first
+                                when (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)) {
+                                    PackageManager.PERMISSION_GRANTED -> {
+                                        // Permission already granted, launch camera
+                                        val tempFile = File(context.cacheDir, "camera_${System.currentTimeMillis()}.jpg")
+                                        cameraImageUri = FileProvider.getUriForFile(
+                                            context,
+                                            "${context.packageName}.fileprovider",
+                                            tempFile
+                                        )
+                                        cameraImageUri?.let { cameraLauncher.launch(it) }
+                                    }
+                                    else -> {
+                                        // Request permission
+                                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                    }
+                                }
                             },
                             text = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
