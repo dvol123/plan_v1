@@ -17,7 +17,7 @@
     <!-- Bottom bar -->
     <string name="home">Домик</string>
     <string name="star">Звезда</string>
-    <string name="edit">Карандаш</string>
+    <string name="edit">Редактировать</string>
     <string name="view">Галочка</string>
     <string name="save">Сохранить</string>
     <string name="cancel">Отмена</string>
@@ -72,6 +72,14 @@
     <!-- Settings -->
     <string name="language">Язык</string>
     <string name="theme">Тема</string>
+    <string name="theme_system">Системная</string>
+    <string name="theme_light">Светлая</string>
+    <string name="theme_dark">Тёмная</string>
+    <string name="restart_required">Перезапустите приложение для применения изменений языка</string>
+    
+    <!-- Camera -->
+    <string name="take_photo">Сделать фото</string>
+    <string name="choose_from_gallery">Выбрать из галереи</string>
     
     <!-- Common -->
     <string name="create">Создать</string>

@@ -4,6 +4,7 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,6 +20,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -40,6 +42,8 @@ import com.plan.app.presentation.viewmodel.ProjectViewModel
 import com.plan.app.presentation.ui.components.RegionCardBottomSheet
 import com.plan.app.presentation.ui.components.CreateRegionDialog
 import kotlinx.coroutines.launch
+import kotlin.math.max
+import kotlin.math.min
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,11 +66,19 @@ fun ProjectScreen(
     var imageSize by remember { mutableStateOf(IntSize.Zero) }
     var cellSizeSlider by remember { mutableStateOf(cellSize.toFloat()) }
     
+    // Track if user has selected cells (for save button activation)
+    val hasSelectedCells = selectedCells.isNotEmpty()
+    
     // Bottom sheet state
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     
     LaunchedEffect(projectId) {
         viewModel.loadProject(projectId)
+    }
+    
+    // Sync slider with cellSize changes
+    LaunchedEffect(cellSize) {
+        cellSizeSlider = cellSize.toFloat()
     }
     
     // Error handling
@@ -181,12 +193,18 @@ fun ProjectScreen(
         bottomBar = {
             ProjectBottomBar(
                 isEditing = isEditing,
-                hasSelectedCells = selectedCells.isNotEmpty(),
+                hasSelectedCells = hasSelectedCells,
                 showRegionCard = uiState.showRegionCard,
                 isEditingRegion = uiState.isEditingRegion,
-                hasRegionChanges = false, // TODO: Track changes
+                hasRegionChanges = hasSelectedCells,
                 onHomeClick = onNavigateBack,
                 onEditRegionClick = { viewModel.startEditingRegion() },
+                onSaveClick = {
+                    // When in editing mode with selected cells, show create region dialog
+                    if (isEditing && hasSelectedCells) {
+                        viewModel.showCreateRegionDialog()
+                    }
+                },
                 onSaveRegionClick = {
                     // Save region changes
                     viewModel.stopEditingRegion()
@@ -205,8 +223,8 @@ fun ProjectScreen(
                 )
             } else {
                 uiState.project?.let { project ->
-                    // Main photo with overlay
-                    PhotoWithOverlay(
+                    // Main photo with overlay - now with zoom support
+                    ZoomablePhotoWithOverlay(
                         project = project,
                         regions = regions,
                         states = states,
@@ -224,14 +242,17 @@ fun ProjectScreen(
                         },
                         onCellSingleTap = { cell ->
                             viewModel.onCellSingleTap(cell)
-                        }
+                        },
+                        isZoomEnabled = !isEditing
                     )
                     
                     // Cell size slider in editing mode
                     if (isEditing) {
                         CellSizeControls(
                             cellSize = cellSizeSlider,
-                            onCellSizeChange = { cellSizeSlider = it },
+                            onCellSizeChange = { newValue ->
+                                cellSizeSlider = newValue
+                            },
                             onCellSizeConfirmed = { 
                                 viewModel.setCellSize(it.toInt())
                             },
@@ -316,7 +337,7 @@ fun ProjectScreen(
 }
 
 @Composable
-private fun PhotoWithOverlay(
+private fun ZoomablePhotoWithOverlay(
     project: Project,
     regions: List<Region>,
     states: List<State>,
@@ -328,10 +349,16 @@ private fun PhotoWithOverlay(
     onImageSizeChanged: (IntSize) -> Unit,
     onRegionDoubleTap: (Region) -> Unit,
     onCellDoubleTap: (Cell) -> Unit,
-    onCellSingleTap: (Cell) -> Unit
+    onCellSingleTap: (Cell) -> Unit,
+    isZoomEnabled: Boolean
 ) {
     var photoWidth by remember { mutableStateOf(0) }
     var photoHeight by remember { mutableStateOf(0) }
+    
+    // Zoom state
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
     
     Box(
         modifier = Modifier
@@ -341,15 +368,39 @@ private fun PhotoWithOverlay(
                 photoWidth = size.width
                 photoHeight = size.height
             }
+            .then(
+                if (isZoomEnabled) {
+                    Modifier.pointerInput(Unit) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            scale = max(0.5f, min(5f, scale * zoom))
+                            
+                            val maxOffsetX = (size.width * (scale - 1) / 2)
+                            val maxOffsetY = (size.height * (scale - 1) / 2)
+                            
+                            offsetX = max(-maxOffsetX, min(maxOffsetX, offsetX + pan.x))
+                            offsetY = max(-maxOffsetY, min(maxOffsetY, offsetY + pan.y))
+                        }
+                    }
+                } else {
+                    Modifier
+                }
+            )
     ) {
-        // Base photo
+        // Base photo with zoom transform
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(project.photoUri)
                 .crossfade(true)
                 .build(),
             contentDescription = project.name,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offsetX,
+                    translationY = offsetY
+                ),
             contentScale = ContentScale.Fit
         )
         
@@ -357,6 +408,12 @@ private fun PhotoWithOverlay(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offsetX,
+                    translationY = offsetY
+                )
                 .pointerInput(isEditing, cellSize) {
                     if (isEditing) {
                         detectTapGestures(
@@ -395,6 +452,12 @@ private fun PhotoWithOverlay(
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offsetX,
+                        translationY = offsetY
+                    )
                     .pointerInput(regions) {
                         detectTapGestures(
                             onDoubleTap = { offset ->
@@ -540,6 +603,7 @@ private fun CellSizeControls(
     modifier: Modifier = Modifier
 ) {
     var showWarning by remember { mutableStateOf(false) }
+    var pendingCellSize by remember { mutableStateOf(cellSize) }
     
     Card(
         modifier = modifier,
@@ -558,40 +622,48 @@ private fun CellSizeControls(
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Minus button - DECREASES grid divisions (makes cells LARGER)
                 IconButton(
                     onClick = { 
+                        // cellSize represents number of divisions
+                        // Decreasing it makes larger cells
                         if (cellSize > 1) {
-                            onCellSizeChange(cellSize / 2)
-                            onCellSizeConfirmed(cellSize / 2)
+                            val newSize = (cellSize - 1).coerceIn(1f, 32f)
+                            onCellSizeChange(newSize)
+                            onCellSizeConfirmed(newSize)
                         }
                     }
                 ) {
-                    Icon(Icons.Default.Remove, contentDescription = "Decrease")
+                    Icon(Icons.Default.Remove, contentDescription = "Decrease grid")
                 }
                 
                 Slider(
                     value = cellSize,
                     onValueChange = { newValue ->
                         if (hasRegions && newValue != cellSize) {
+                            pendingCellSize = newValue
                             showWarning = true
                         } else {
                             onCellSizeChange(newValue)
+                            onCellSizeConfirmed(newValue)
                         }
                     },
                     valueRange = 1f..32f,
-                    steps = 4,
+                    steps = 30,
                     modifier = Modifier.weight(1f)
                 )
                 
+                // Plus button - INCREASES grid divisions (makes cells SMALLER)
                 IconButton(
                     onClick = { 
                         if (cellSize < 32) {
-                            onCellSizeChange(cellSize * 2)
-                            onCellSizeConfirmed(cellSize * 2)
+                            val newSize = (cellSize + 1).coerceIn(1f, 32f)
+                            onCellSizeChange(newSize)
+                            onCellSizeConfirmed(newSize)
                         }
                     }
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Increase")
+                    Icon(Icons.Default.Add, contentDescription = "Increase grid")
                 }
             }
         }
@@ -605,7 +677,8 @@ private fun CellSizeControls(
             confirmButton = {
                 TextButton(onClick = {
                     showWarning = false
-                    onCellSizeConfirmed(cellSize)
+                    onCellSizeChange(pendingCellSize)
+                    onCellSizeConfirmed(pendingCellSize)
                 }) {
                     Text(stringResource(R.string.confirm))
                 }
@@ -628,6 +701,7 @@ private fun ProjectBottomBar(
     hasRegionChanges: Boolean,
     onHomeClick: () -> Unit,
     onEditRegionClick: () -> Unit,
+    onSaveClick: () -> Unit,
     onSaveRegionClick: () -> Unit
 ) {
     NavigationBar {
@@ -672,20 +746,27 @@ private fun ProjectBottomBar(
         
         NavigationBarItem(
             selected = false,
-            onClick = { if (hasRegionChanges) onSaveRegionClick() },
+            onClick = { 
+                if (isEditing && hasSelectedCells) {
+                    onSaveClick()
+                } else if (showRegionCard && hasRegionChanges) {
+                    onSaveRegionClick()
+                }
+            },
             icon = {
+                val isEnabled = (isEditing && hasSelectedCells) || (showRegionCard && hasRegionChanges)
                 Icon(
                     Icons.Default.Check,
                     contentDescription = "Save",
-                    tint = if (showRegionCard && hasRegionChanges) {
-                        MaterialTheme.colorScheme.onSurface
+                    tint = if (isEnabled) {
+                        MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                     }
                 )
             },
             label = { Text(stringResource(R.string.save)) },
-            enabled = showRegionCard && hasRegionChanges
+            enabled = (isEditing && hasSelectedCells) || (showRegionCard && hasRegionChanges)
         )
     }
 }

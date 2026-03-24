@@ -22,6 +22,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -30,6 +32,7 @@ import com.plan.app.R
 import com.plan.app.domain.model.Project
 import com.plan.app.presentation.viewmodel.MainViewModel
 import com.plan.app.presentation.ui.components.*
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,7 +45,10 @@ fun MainScreen(
     val context = LocalContext.current
     
     var showMenu by remember { mutableStateOf(false) }
+    var showAddMenu by remember { mutableStateOf(false) }
     var selectedPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    var fullscreenPhotoUri by remember { mutableStateOf<String?>(null) }
+    var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
     
     // Photo picker launcher
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -58,7 +64,8 @@ fun MainScreen(
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
-        if (success && selectedPhotoUri != null) {
+        if (success && cameraImageUri != null) {
+            selectedPhotoUri = cameraImageUri
             viewModel.showCreateDialog()
         }
     }
@@ -90,7 +97,7 @@ fun MainScreen(
                             text = { Text(stringResource(R.string.add)) },
                             onClick = {
                                 showMenu = false
-                                photoPickerLauncher.launch("image/*")
+                                showAddMenu = true
                             },
                             leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) }
                         )
@@ -109,7 +116,7 @@ fun MainScreen(
                                 // TODO: Implement share
                             },
                             leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) }
-                        )
+                        }
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.export_project)) },
                             onClick = {
@@ -125,7 +132,7 @@ fun MainScreen(
                                 viewModel.showSettingsDialog()
                             },
                             leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
-                        )
+                        }
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.exit)) },
                             onClick = {
@@ -133,6 +140,32 @@ fun MainScreen(
                                 // TODO: Implement exit with confirmation
                             },
                             leadingIcon = { Icon(Icons.Default.ExitToApp, contentDescription = null) }
+                        }
+                    }
+                    
+                    // Add submenu for camera/gallery
+                    DropdownMenu(
+                        expanded = showAddMenu,
+                        onDismissRequest = { showAddMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.take_photo)) },
+                            onClick = {
+                                showAddMenu = false
+                                // Create temp file for camera image
+                                val tempFile = File(context.cacheDir, "camera_${System.currentTimeMillis()}.jpg")
+                                cameraImageUri = Uri.fromFile(tempFile)
+                                cameraLauncher.launch(cameraImageUri)
+                            },
+                            leadingIcon = { Icon(Icons.Default.CameraAlt, contentDescription = null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.choose_from_gallery)) },
+                            onClick = {
+                                showAddMenu = false
+                                photoPickerLauncher.launch("image/*")
+                            },
+                            leadingIcon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) }
                         )
                     }
                 }
@@ -195,11 +228,47 @@ fun MainScreen(
                             isSelected = uiState.selectedProject?.id == project.id,
                             onSelect = { viewModel.selectProject(project) },
                             onThumbnailClick = {
-                                // Open full-screen photo view
+                                fullscreenPhotoUri = project.photoUri
                             }
                         )
                     }
                 }
+            }
+        }
+    }
+    
+    // Fullscreen photo dialog
+    if (fullscreenPhotoUri != null) {
+        Dialog(
+            onDismissRequest = { fullscreenPhotoUri = null },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.black)
+            ) {
+                IconButton(
+                    onClick = { fullscreenPhotoUri = null },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = MaterialTheme.colorScheme.white
+                    )
+                }
+                
+                ZoomableImage(
+                    model = fullscreenPhotoUri,
+                    contentDescription = "Full screen photo",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
             }
         }
     }
@@ -334,7 +403,7 @@ private fun ProjectListItem(
                 }
             }
             
-            // Thumbnail
+            // Thumbnail - clickable for fullscreen view
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(project.photoUri)
@@ -418,3 +487,11 @@ private fun MainBottomBar(
         )
     }
 }
+
+// Extension property for black color
+private val MaterialTheme.colorScheme.black
+    get() = androidx.compose.ui.graphics.Color.Black
+
+// Extension property for white color
+private val MaterialTheme.colorScheme.white
+    get() = androidx.compose.ui.graphics.Color.White

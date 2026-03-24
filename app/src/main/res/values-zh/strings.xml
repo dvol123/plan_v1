@@ -72,6 +72,14 @@
     <!-- Settings -->
     <string name="language">语言</string>
     <string name="theme">主题</string>
+    <string name="theme_system">跟随系统</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+    <string name="restart_required">请重启应用以使语言更改生效</string>
+    
+    <!-- Camera -->
+    <string name="take_photo">拍照</string>
+    <string name="choose_from_gallery">从相册选择</string>
     
     <!-- Common -->
     <string name="create">创建</string>

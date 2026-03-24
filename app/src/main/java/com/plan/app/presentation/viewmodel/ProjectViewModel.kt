@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -60,7 +61,15 @@ class ProjectViewModel @Inject constructor(
     
     private val _projectId = MutableStateFlow(0L)
     
-    val regions: StateFlow<List<Region>> = regionRepository.getRegionsByProject(_projectId.value)
+    // Use flatMapLatest to properly react to projectId changes
+    val regions: StateFlow<List<Region>> = _projectId
+        .flatMapLatest { projectId ->
+            if (projectId > 0) {
+                regionRepository.getRegionsByProject(projectId)
+            } else {
+                MutableStateFlow(emptyList())
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
     
     val states: StateFlow<List<State>> = stateRepository.getAllStates()
