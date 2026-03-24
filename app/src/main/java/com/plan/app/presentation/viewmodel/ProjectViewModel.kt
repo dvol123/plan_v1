@@ -111,11 +111,38 @@ class ProjectViewModel @Inject constructor(
     }
     
     fun selectRegion(region: Region?) {
+        // Just select the region without showing the card
         _uiState.value = _uiState.value.copy(
             selectedRegion = region,
-            showRegionCard = region != null,
+            showRegionCard = false,
             isEditingRegion = false
         )
+    }
+    
+    fun deselectRegion() {
+        _uiState.value = _uiState.value.copy(
+            selectedRegion = null,
+            showRegionCard = false,
+            isEditingRegion = false
+        )
+    }
+    
+    fun viewRegion() {
+        if (_uiState.value.selectedRegion != null) {
+            _uiState.value = _uiState.value.copy(
+                showRegionCard = true,
+                isEditingRegion = false
+            )
+        }
+    }
+    
+    fun editRegion() {
+        if (_uiState.value.selectedRegion != null) {
+            _uiState.value = _uiState.value.copy(
+                showRegionCard = true,
+                isEditingRegion = true
+            )
+        }
     }
     
     fun startEditingRegion() {

@@ -119,7 +119,12 @@ fun ProjectScreen(
                             Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                         }
                     },
-                    actions = { }
+                    actions = {
+                        // Menu button also visible in editing mode
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Menu")
+                        }
+                    }
                 )
                 
                 // Bottom row: search bar and menu button (like first screen)
@@ -171,23 +176,44 @@ fun ProjectScreen(
                 expanded = showMenu,
                 onDismissRequest = { showMenu = false }
             ) {
-                DropdownMenuItem(
-                    onClick = {
-                        showMenu = false
-                        viewModel.toggleEditMode()
-                    },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                if (isEditing) Icons.Default.Visibility else Icons.Default.Edit,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.edit))
+                // In editing mode, show option to exit editing mode
+                if (isEditing) {
+                    DropdownMenuItem(
+                        onClick = {
+                            showMenu = false
+                            viewModel.toggleEditMode()
+                        },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Visibility,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(stringResource(R.string.view_mode))
+                            }
                         }
-                    }
-                )
+                    )
+                } else {
+                    DropdownMenuItem(
+                        onClick = {
+                            showMenu = false
+                            viewModel.toggleEditMode()
+                        },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(stringResource(R.string.edit_mode))
+                            }
+                        }
+                    )
+                }
                 DropdownMenuItem(
                     onClick = {
                         showMenu = false
@@ -214,43 +240,60 @@ fun ProjectScreen(
                         }
                     }
                 )
-                DropdownMenuItem(
-                    onClick = {
-                        showMenu = false
-                        viewModel.showDeleteConfirm()
-                    },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(24.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.delete))
+                // Delete and Clear only in editing mode
+                if (isEditing) {
+                    DropdownMenuItem(
+                        onClick = {
+                            showMenu = false
+                            viewModel.showDeleteConfirm()
+                        },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(24.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(stringResource(R.string.delete))
+                            }
                         }
-                    }
-                )
-                DropdownMenuItem(
-                    onClick = {
-                        showMenu = false
-                        viewModel.showClearConfirm()
-                    },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(24.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.clear))
+                    )
+                    DropdownMenuItem(
+                        onClick = {
+                            showMenu = false
+                            viewModel.showClearConfirm()
+                        },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(24.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(stringResource(R.string.clear))
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         },
         bottomBar = {
             ProjectBottomBar(
                 isEditing = isEditing,
                 hasSelectedCells = hasSelectedCells,
+                selectedRegion = uiState.selectedRegion,
                 showRegionCard = uiState.showRegionCard,
                 isEditingRegion = uiState.isEditingRegion,
                 hasRegionChanges = hasSelectedCells,
-                onHomeClick = onNavigateBack,
-                onEditRegionClick = { viewModel.startEditingRegion() },
+                onHomeClick = {
+                    // If region is selected, deselect it; otherwise navigate back
+                    if (uiState.selectedRegion != null) {
+                        viewModel.deselectRegion()
+                    } else {
+                        onNavigateBack()
+                    }
+                },
+                onHomeDoubleClick = {
+                    // Double-tap on home always navigates back
+                    viewModel.deselectRegion()
+                    onNavigateBack()
+                },
+                onEditRegionClick = { viewModel.editRegion() },
+                onViewRegionClick = { viewModel.viewRegion() },
                 onSaveClick = {
                     // When in editing mode with selected cells, show create region dialog
                     if (isEditing && hasSelectedCells) {
@@ -284,10 +327,16 @@ fun ProjectScreen(
                         selectedCells = selectedCells,
                         cellSize = cellSize,
                         highlightedRegionIds = uiState.highlightedRegionIds,
+                        selectedRegionId = uiState.selectedRegion?.id,
                         imageSize = imageSize,
                         onImageSizeChanged = { imageSize = it },
                         onRegionDoubleTap = { region ->
-                            viewModel.selectRegion(region)
+                            // Toggle selection: if already selected, deselect; otherwise select
+                            if (uiState.selectedRegion?.id == region.id) {
+                                viewModel.deselectRegion()
+                            } else {
+                                viewModel.selectRegion(region)
+                            }
                         },
                         onCellDoubleTap = { cell ->
                             viewModel.onCellDoubleTap(cell)
@@ -396,6 +445,7 @@ private fun ZoomablePhotoWithOverlay(
     selectedCells: Set<Cell>,
     cellSize: Int,
     highlightedRegionIds: Set<Long>,
+    selectedRegionId: Long?,
     imageSize: IntSize,
     onImageSizeChanged: (IntSize) -> Unit,
     onRegionDoubleTap: (Region) -> Unit,
@@ -493,7 +543,8 @@ private fun ZoomablePhotoWithOverlay(
                 regions.forEach { region ->
                     val state = states.find { it.id == region.stateId }
                     val isHighlighted = highlightedRegionIds.contains(region.id)
-                    drawRegion(region, state, cellSize, photoWidth, photoHeight, isHighlighted)
+                    val isSelected = selectedRegionId == region.id
+                    drawRegion(region, state, cellSize, photoWidth, photoHeight, isHighlighted, isSelected)
                 }
             }
         }
@@ -615,7 +666,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRegion(
     cellSize: Int,
     width: Int,
     height: Int,
-    isHighlighted: Boolean
+    isHighlighted: Boolean,
+    isSelected: Boolean = false
 ) {
     if (region.cells.isEmpty()) return
     
@@ -628,8 +680,14 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRegion(
     val color = state?.color?.let { Color(it) } ?: Color.Gray
     
     region.cells.forEach { cell ->
+        val alpha = when {
+            isSelected -> 0.7f
+            isHighlighted -> 0.6f
+            else -> 0.5f
+        }
+        
         drawRect(
-            color = color.copy(alpha = if (isHighlighted) 0.7f else 0.5f),
+            color = color.copy(alpha = alpha),
             topLeft = Offset(
                 x = cell.col * cellWidth,
                 y = cell.row * cellHeight
@@ -637,15 +695,16 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRegion(
             size = Size(cellWidth, cellHeight)
         )
         
-        if (isHighlighted) {
+        // Draw border for highlighted or selected regions
+        if (isHighlighted || isSelected) {
             drawRect(
-                color = Color.Yellow,
+                color = if (isSelected) Color.White else Color.Yellow,
                 topLeft = Offset(
                     x = cell.col * cellWidth,
                     y = cell.row * cellHeight
                 ),
                 size = Size(cellWidth, cellHeight),
-                style = Stroke(width = 3f)
+                style = Stroke(width = if (isSelected) 4f else 3f)
             )
         }
     }
@@ -769,22 +828,39 @@ private fun CellSizeControls(
 private fun ProjectBottomBar(
     isEditing: Boolean,
     hasSelectedCells: Boolean,
+    selectedRegion: Region?,
     showRegionCard: Boolean,
     isEditingRegion: Boolean,
     hasRegionChanges: Boolean,
     onHomeClick: () -> Unit,
+    onHomeDoubleClick: () -> Unit,
     onEditRegionClick: () -> Unit,
+    onViewRegionClick: () -> Unit,
     onSaveClick: () -> Unit,
     onSaveRegionClick: () -> Unit
 ) {
+    // Track last click time for double-tap detection
+    var lastHomeClickTime by remember { mutableStateOf(0L) }
+    
     NavigationBar {
         NavigationBarItem(
             selected = false,
-            onClick = onHomeClick,
+            onClick = {
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - lastHomeClickTime < 300) {
+                    // Double tap
+                    onHomeDoubleClick()
+                } else {
+                    // Single tap
+                    onHomeClick()
+                }
+                lastHomeClickTime = currentTime
+            },
             icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
             label = { Text(stringResource(R.string.home)) }
         )
         
+        // Star button (placeholder)
         NavigationBarItem(
             selected = false,
             onClick = { },
@@ -799,38 +875,21 @@ private fun ProjectBottomBar(
             enabled = false
         )
         
-        NavigationBarItem(
-            selected = false,
-            onClick = { if (showRegionCard) onEditRegionClick() },
-            icon = {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = "Edit",
-                    tint = if (showRegionCard) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                    }
-                )
-            },
-            label = { Text(stringResource(R.string.edit)) },
-            enabled = showRegionCard
-        )
-        
+        // Edit button - active when a region is selected in view mode
         NavigationBarItem(
             selected = false,
             onClick = { 
-                if (isEditing && hasSelectedCells) {
-                    onSaveClick()
-                } else if (showRegionCard && hasRegionChanges) {
-                    onSaveRegionClick()
+                if (selectedRegion != null) {
+                    onEditRegionClick()
+                } else if (showRegionCard) {
+                    onEditRegionClick()
                 }
             },
             icon = {
-                val isEnabled = (isEditing && hasSelectedCells) || (showRegionCard && hasRegionChanges)
+                val isEnabled = selectedRegion != null || showRegionCard
                 Icon(
-                    Icons.Default.Check,
-                    contentDescription = "Save",
+                    Icons.Default.Edit,
+                    contentDescription = "Edit",
                     tint = if (isEnabled) {
                         MaterialTheme.colorScheme.primary
                     } else {
@@ -838,8 +897,36 @@ private fun ProjectBottomBar(
                     }
                 )
             },
-            label = { Text(stringResource(R.string.save)) },
-            enabled = (isEditing && hasSelectedCells) || (showRegionCard && hasRegionChanges)
+            label = { Text(stringResource(R.string.edit)) },
+            enabled = selectedRegion != null || showRegionCard
+        )
+        
+        // View/Check button - active when a region is selected in view mode
+        NavigationBarItem(
+            selected = false,
+            onClick = { 
+                if (selectedRegion != null) {
+                    onViewRegionClick()
+                } else if (isEditing && hasSelectedCells) {
+                    onSaveClick()
+                } else if (showRegionCard && hasRegionChanges) {
+                    onSaveRegionClick()
+                }
+            },
+            icon = {
+                val isEnabled = selectedRegion != null || (isEditing && hasSelectedCells) || (showRegionCard && hasRegionChanges)
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = "View",
+                    tint = if (isEnabled) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    }
+                )
+            },
+            label = { Text(stringResource(R.string.view)) },
+            enabled = selectedRegion != null || (isEditing && hasSelectedCells) || (showRegionCard && hasRegionChanges)
         )
     }
 }
