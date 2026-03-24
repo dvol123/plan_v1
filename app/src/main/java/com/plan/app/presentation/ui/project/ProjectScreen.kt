@@ -466,7 +466,7 @@ private fun ZoomablePhotoWithOverlay(
                 regions.forEach { region ->
                     val state = states.find { it.id == region.stateId }
                     val isHighlighted = highlightedRegionIds.contains(region.id)
-                    drawRegion(region, state, photoWidth, photoHeight, isHighlighted)
+                    drawRegion(region, state, cellSize, photoWidth, photoHeight, isHighlighted)
                 }
             }
         }
@@ -581,16 +581,18 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSelectedCell(
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRegion(
     region: Region,
     state: State?,
+    cellSize: Int,
     width: Int,
     height: Int,
     isHighlighted: Boolean
 ) {
     if (region.cells.isEmpty()) return
     
-    // Calculate cell size based on image dimensions
-    // This is simplified - actual implementation would need photo dimensions
-    val cellWidth = size.width / 10f // Placeholder
-    val cellHeight = size.height / 10f // Placeholder
+    // Calculate cell dimensions based on the grid cellSize
+    // cellSize represents the number of divisions (e.g., 10 means 10x10 grid)
+    val gridDivisions = if (cellSize > 0) cellSize else 10
+    val cellWidth = size.width / gridDivisions.toFloat()
+    val cellHeight = size.height / gridDivisions.toFloat()
     
     val color = state?.color?.let { Color(it) } ?: Color.Gray
     
@@ -629,6 +631,9 @@ private fun CellSizeControls(
     var showWarning by remember { mutableStateOf(false) }
     var pendingCellSize by remember { mutableStateOf(cellSize) }
     
+    // Available cell sizes are powers of 2: 1, 2, 4, 8, 16, 32
+    val cellSizeOptions = listOf(1f, 2f, 4f, 8f, 16f, 32f)
+    
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(
@@ -646,13 +651,12 @@ private fun CellSizeControls(
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Minus button - DECREASES grid divisions (makes cells LARGER)
+                // Minus button - decreases to previous power of 2
                 IconButton(
                     onClick = { 
-                        // cellSize represents number of divisions
-                        // Decreasing it makes larger cells
-                        if (cellSize > 1) {
-                            val newSize = (cellSize - 1).coerceIn(1f, 32f)
+                        val currentIndex = cellSizeOptions.indexOf(cellSize)
+                        if (currentIndex > 0) {
+                            val newSize = cellSizeOptions[currentIndex - 1]
                             onCellSizeChange(newSize)
                             onCellSizeConfirmed(newSize)
                         }
@@ -664,24 +668,30 @@ private fun CellSizeControls(
                 Slider(
                     value = cellSize,
                     onValueChange = { newValue ->
-                        if (hasRegions && newValue != cellSize) {
-                            pendingCellSize = newValue
+                        // Find nearest power of 2
+                        val nearestPowerOf2 = cellSizeOptions.minByOrNull { 
+                            kotlin.math.abs(it - newValue) 
+                        } ?: cellSize
+                        
+                        if (hasRegions && nearestPowerOf2 != cellSize) {
+                            pendingCellSize = nearestPowerOf2
                             showWarning = true
                         } else {
-                            onCellSizeChange(newValue)
-                            onCellSizeConfirmed(newValue)
+                            onCellSizeChange(nearestPowerOf2)
+                            onCellSizeConfirmed(nearestPowerOf2)
                         }
                     },
                     valueRange = 1f..32f,
-                    steps = 30,
+                    steps = 4, // 5 steps between 6 values
                     modifier = Modifier.weight(1f)
                 )
                 
-                // Plus button - INCREASES grid divisions (makes cells SMALLER)
+                // Plus button - increases to next power of 2
                 IconButton(
                     onClick = { 
-                        if (cellSize < 32) {
-                            val newSize = (cellSize + 1).coerceIn(1f, 32f)
+                        val currentIndex = cellSizeOptions.indexOf(cellSize)
+                        if (currentIndex < cellSizeOptions.size - 1) {
+                            val newSize = cellSizeOptions[currentIndex + 1]
                             onCellSizeChange(newSize)
                             onCellSizeConfirmed(newSize)
                         }
@@ -690,6 +700,14 @@ private fun CellSizeControls(
                     Icon(Icons.Default.Add, contentDescription = "Increase grid")
                 }
             }
+            
+            // Show current grid size
+            Text(
+                text = "${cellSize.toInt()} × ${cellSize.toInt()}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
         }
     }
     

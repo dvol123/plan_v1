@@ -6,8 +6,10 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -58,6 +60,7 @@ fun MainScreen(
     var fullscreenPhotoUri by remember { mutableStateOf<String?>(null) }
     var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
     var showCameraPermissionDenied by remember { mutableStateOf(false) }
+    var showViewDialog by remember { mutableStateOf(false) }
     
     // Camera permission launcher
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -121,11 +124,29 @@ fun MainScreen(
         )
     }
     
+    // View project dialog (read-only)
+    if (showViewDialog && uiState.selectedProject != null) {
+        ViewProjectDialog(
+            project = uiState.selectedProject!!,
+            onDismiss = { showViewDialog = false }
+        )
+    }
+    
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(text = stringResource(R.string.app_name))
+                    // Search bar in header as per specification
+                    OutlinedTextField(
+                        value = uiState.searchQuery,
+                        onValueChange = { viewModel.setSearchQuery(it) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        placeholder = { Text(stringResource(R.string.search_projects)) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        singleLine = true
+                    )
                 },
                 actions = {
                     IconButton(onClick = { showMenu = true }) {
@@ -278,7 +299,7 @@ fun MainScreen(
                     viewModel.showEditDialog()
                 },
                 onViewDetailsClick = {
-                    // Show view-only dialog
+                    showViewDialog = true
                 }
             )
         }
@@ -288,18 +309,6 @@ fun MainScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Search bar
-            OutlinedTextField(
-                value = uiState.searchQuery,
-                onValueChange = { viewModel.setSearchQuery(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                placeholder = { Text(stringResource(R.string.search_projects)) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                singleLine = true
-            )
-            
             // Project list
             if (filteredProjects.isEmpty()) {
                 Box(
@@ -450,6 +459,7 @@ fun MainScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ProjectListItem(
     project: Project,
@@ -462,7 +472,10 @@ private fun ProjectListItem(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onSelect),
+            .combinedClickable(
+                onClick = { }, // Single tap does nothing for selection
+                onDoubleClick = onSelect // Double-tap selects the project (as per spec)
+            ),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) {
                 MaterialTheme.colorScheme.primaryContainer
@@ -498,7 +511,7 @@ private fun ProjectListItem(
                 }
             }
             
-            // Thumbnail - clickable for fullscreen view
+            // Thumbnail - clickable for fullscreen view (single tap as per spec)
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(project.photoUri)
@@ -581,4 +594,61 @@ private fun MainBottomBar(
             enabled = selectedProject != null
         )
     }
+}
+
+/**
+ * Read-only view dialog for viewing all project fields
+ */
+@Composable
+private fun ViewProjectDialog(
+    project: Project,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.project_name_label, project.name)) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (!project.type1.isNullOrBlank()) {
+                    Text(
+                        text = stringResource(R.string.type1) + ":",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    Text(text = project.type1, style = MaterialTheme.typography.bodyMedium)
+                }
+                
+                if (!project.type2.isNullOrBlank()) {
+                    Text(
+                        text = stringResource(R.string.type2) + ":",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    Text(text = project.type2, style = MaterialTheme.typography.bodyMedium)
+                }
+                
+                if (!project.description.isNullOrBlank()) {
+                    Text(
+                        text = stringResource(R.string.description) + ":",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    Text(text = project.description, style = MaterialTheme.typography.bodyMedium)
+                }
+                
+                if (!project.note.isNullOrBlank()) {
+                    Text(
+                        text = stringResource(R.string.note) + ":",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    Text(text = project.note, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.ok))
+            }
+        }
+    )
 }
