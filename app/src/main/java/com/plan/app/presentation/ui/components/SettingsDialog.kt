@@ -3,7 +3,6 @@ package com.plan.app.presentation.ui.components
 import android.content.Context
 import android.os.Build
 import android.os.LocaleList
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -52,7 +51,7 @@ object AppPreferences {
     
     fun getTheme(context: Context): Int {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getInt(KEY_THEME, AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+            .getInt(KEY_THEME, 0) // 0 = System default
     }
 }
 
@@ -71,7 +70,9 @@ fun applyLanguage(context: Context, languageCode: String): Context {
         context.createConfigurationContext(config)
     } else {
         val config = context.resources.configuration
+        @Suppress("DEPRECATION")
         config.setLocale(locale)
+        @Suppress("DEPRECATION")
         context.createConfigurationContext(config)
     }
 }
@@ -96,9 +97,9 @@ fun SettingsDialog(
     val languages = AppLanguage.entries
     
     val themes = listOf(
-        AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM to stringResource(R.string.theme_system),
-        AppCompatDelegate.MODE_NIGHT_NO to stringResource(R.string.theme_light),
-        AppCompatDelegate.MODE_NIGHT_YES to stringResource(R.string.theme_dark)
+        0 to stringResource(R.string.theme_system),
+        1 to stringResource(R.string.theme_light),
+        2 to stringResource(R.string.theme_dark)
     )
     
     if (showRestartMessage) {
@@ -176,7 +177,6 @@ fun SettingsDialog(
                                 onClick = { 
                                     selectedTheme = themeMode
                                     AppPreferences.saveTheme(context, themeMode)
-                                    AppCompatDelegate.setDefaultNightMode(themeMode)
                                 }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
