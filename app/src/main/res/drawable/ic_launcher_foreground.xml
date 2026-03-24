@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Grid pattern for "Plan" app -->
+    <group android:translateX="27" android:translateY="27">
+        <!-- Grid cells -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M0,0h54v54h-54z"/>
+        <!-- Grid cells with semi-transparent overlay -->
+        <path
+            android:fillColor="#6750A4"
+            android:pathData="M4,4v46h46v-46z"/>
+        <!-- Cell 1 -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M10,10h14v14h-14z"
+            android:fillAlpha="0.9"/>
+        <!-- Cell 2 -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M30,10h14v14h-14z"
+            android:fillAlpha="0.7"/>
+        <!-- Cell 3 -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M10,30h14v14h-14z"
+            android:fillAlpha="0.7"/>
+        <!-- Cell 4 -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M30,30h14v14h-14z"
+            android:fillAlpha="0.5"/>
+    </group>
+</vector>
