@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Default state colors -->
+    <color name="state_red">#FFFF0000</color>
+    <color name="state_orange">#FFFFA500</color>
+    <color name="state_yellow">#FFFFFF00</color>
+    <color name="state_green">#FF00FF00</color>
+    <color name="state_cyan">#FF00FFFF</color>
+    <color name="state_blue">#FF0000FF</color>
+    <color name="state_violet">#FF8B00FF</color>
+</resources>

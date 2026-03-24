@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">План</string>
+    
+    <!-- Main Screen -->
+    <string name="search_projects">Поиск проектов</string>
+    <string name="no_projects">Нет проектов. Нажмите + для создания.</string>
+    
+    <!-- Menu items -->
+    <string name="add">Добавить</string>
+    <string name="import_project">Импорт</string>
+    <string name="export_project">Экспорт</string>
+    <string name="share">Обмен</string>
+    <string name="settings">Настройки</string>
+    <string name="exit">Выход</string>
+    
+    <!-- Bottom bar -->
+    <string name="home">Домик</string>
+    <string name="star">Звезда</string>
+    <string name="edit">Карандаш</string>
+    <string name="view">Галочка</string>
+    <string name="save">Сохранить</string>
+    <string name="cancel">Отмена</string>
+    <string name="delete">Удалить</string>
+    <string name="clear">Очистить</string>
+    <string name="confirm">Подтвердить</string>
+    <string name="ok">ОК</string>
+    
+    <!-- Project -->
+    <string name="create_project">Создать проект</string>
+    <string name="edit_project">Редактировать проект</string>
+    <string name="delete_project">Удалить проект</string>
+    <string name="delete_project_confirmation">Вы уверены, что хотите удалить этот проект? Все области и медиа будут потеряны.</string>
+    <string name="project_name">Название</string>
+    <string name="project_name_label">Проект: %s</string>
+    <string name="type1">Тип 1</string>
+    <string name="type2">Тип 2</string>
+    <string name="description">Описание</string>
+    <string name="note">Заметка</string>
+    <string name="field_required">Обязательное поле</string>
+    
+    <!-- Project Screen -->
+    <string name="loading">Загрузка…</string>
+    <string name="editing_mode">Режим редактирования</string>
+    <string name="search_regions">Поиск областей</string>
+    
+    <!-- Grid -->
+    <string name="cell_size">Размер ячейки</string>
+    <string name="warning">Предупреждение</string>
+    <string name="cell_size_change_warning">Изменение размера ячейки удалит все существующие области. Продолжить?</string>
+    
+    <!-- Region -->
+    <string name="create_region">Создать область</string>
+    <string name="edit_region">Редактировать область</string>
+    <string name="region_details">Детали области</string>
+    <string name="region_name">Название области</string>
+    <string name="state">Состояние</string>
+    <string name="state_name">Название состояния</string>
+    <string name="new_state">Новое состояние</string>
+    <string name="create_state">Создать состояние</string>
+    <string name="select_color">Выберите цвет</string>
+    
+    <!-- Regions -->
+    <string name="clear_regions">Очистить области</string>
+    <string name="clear_regions_confirmation">Вы уверены, что хотите удалить все области? Это действие нельзя отменить.</string>
+    
+    <!-- Media -->
+    <string name="media">Медиа</string>
+    <string name="add_photo">Добавить фото</string>
+    <string name="add_video">Добавить видео</string>
+    
+    <!-- Settings -->
+    <string name="language">Язык</string>
+    <string name="theme">Тема</string>
+    
+    <!-- Common -->
+    <string name="create">Создать</string>
+    <string name="unsaved_changes">Есть несохранённые изменения. Сохранить перед выходом?</string>
+    <string name="dont_save">Не сохранять</string>
+</resources>
