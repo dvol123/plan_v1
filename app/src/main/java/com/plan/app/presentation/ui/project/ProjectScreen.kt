@@ -39,9 +39,8 @@ import com.plan.app.domain.model.Project
 import com.plan.app.domain.model.Region
 import com.plan.app.domain.model.State
 import com.plan.app.presentation.viewmodel.ProjectViewModel
-import com.plan.app.presentation.ui.components.RegionCardBottomSheet
+import com.plan.app.presentation.ui.components.RegionCardDialog
 import com.plan.app.presentation.ui.components.CreateRegionDialog
-import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
 
@@ -60,7 +59,6 @@ fun ProjectScreen(
     val cellSize by viewModel.cellSize.collectAsStateWithLifecycle()
     
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     
     var showMenu by remember { mutableStateOf(false) }
     var imageSize by remember { mutableStateOf(IntSize.Zero) }
@@ -68,9 +66,6 @@ fun ProjectScreen(
     
     // Track if user has selected cells (for save button activation)
     val hasSelectedCells = selectedCells.isNotEmpty()
-    
-    // Bottom sheet state
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     
     LaunchedEffect(projectId) {
         viewModel.loadProject(projectId)
@@ -91,128 +86,161 @@ fun ProjectScreen(
     
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = uiState.project?.name ?: stringResource(R.string.loading),
-                            maxLines = 1
-                        )
-                        if (isEditing) {
+            // Header with project name on top, search and menu below
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+            ) {
+                // Top row: project name with back button
+                TopAppBar(
+                    title = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Text(
-                                text = stringResource(R.string.editing_mode),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
+                                text = uiState.project?.name ?: stringResource(R.string.loading),
+                                maxLines = 1,
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.weight(1f)
                             )
+                            if (isEditing) {
+                                Text(
+                                    text = stringResource(R.string.editing_mode),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    // Search bar in header
-                    if (!isEditing) {
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = { }
+                )
+                
+                // Bottom row: search bar and menu button (like first screen)
+                if (!isEditing) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .padding(bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         OutlinedTextField(
                             value = uiState.searchQuery,
                             onValueChange = { viewModel.setSearchQuery(it) },
                             modifier = Modifier
-                                .width(150.dp)
-                                .height(40.dp),
-                            placeholder = { Text(stringResource(R.string.search_regions), fontSize = MaterialTheme.typography.labelSmall.fontSize) },
+                                .weight(1f)
+                                .height(48.dp),
+                            placeholder = { Text(stringResource(R.string.search_regions)) },
                             leadingIcon = { 
                                 Icon(
                                     Icons.Default.Search, 
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
+                                    contentDescription = null
                                 ) 
+                            },
+                            trailingIcon = {
+                                if (uiState.searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+                                    }
+                                }
                             },
                             singleLine = true
                         )
-                    }
-                    
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menu")
-                    }
-                    
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            onClick = {
-                                showMenu = false
-                                viewModel.toggleEditMode()
-                            },
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        if (isEditing) Icons.Default.Visibility else Icons.Default.Edit,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(stringResource(R.string.edit))
-                                }
-                            }
-                        )
-                        DropdownMenuItem(
-                            onClick = {
-                                showMenu = false
-                                // TODO: Export for PC
-                            },
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(24.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(stringResource(R.string.export_project))
-                                }
-                            }
-                        )
-                        DropdownMenuItem(
-                            onClick = {
-                                showMenu = false
-                                // TODO: Share via Wi-Fi/Bluetooth
-                            },
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(24.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(stringResource(R.string.share))
-                                }
-                            }
-                        )
-                        DropdownMenuItem(
-                            onClick = {
-                                showMenu = false
-                                viewModel.showDeleteConfirm()
-                            },
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(24.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(stringResource(R.string.delete))
-                                }
-                            }
-                        )
-                        DropdownMenuItem(
-                            onClick = {
-                                showMenu = false
-                                viewModel.showClearConfirm()
-                            },
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(24.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(stringResource(R.string.clear))
-                                }
-                            }
-                        )
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        IconButton(
+                            onClick = { showMenu = true },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(Icons.Default.Menu, contentDescription = "Menu")
+                        }
                     }
                 }
-            )
+            }
+            
+            // Dropdown menu (outside Column to properly overlay)
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false }
+            ) {
+                DropdownMenuItem(
+                    onClick = {
+                        showMenu = false
+                        viewModel.toggleEditMode()
+                    },
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                if (isEditing) Icons.Default.Visibility else Icons.Default.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.edit))
+                        }
+                    }
+                )
+                DropdownMenuItem(
+                    onClick = {
+                        showMenu = false
+                        // TODO: Export for PC
+                    },
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.export_project))
+                        }
+                    }
+                )
+                DropdownMenuItem(
+                    onClick = {
+                        showMenu = false
+                        // TODO: Share via Wi-Fi/Bluetooth
+                    },
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.share))
+                        }
+                    }
+                )
+                DropdownMenuItem(
+                    onClick = {
+                        showMenu = false
+                        viewModel.showDeleteConfirm()
+                    },
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.delete))
+                        }
+                    }
+                )
+                DropdownMenuItem(
+                    onClick = {
+                        showMenu = false
+                        viewModel.showClearConfirm()
+                    },
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.clear))
+                        }
+                    }
+                )
+            }
         },
         bottomBar = {
             ProjectBottomBar(
@@ -291,13 +319,12 @@ fun ProjectScreen(
         }
     }
     
-    // Region card bottom sheet
+    // Region card dialog - doesn't overlap bottom bar
     if (uiState.showRegionCard && uiState.selectedRegion != null) {
-        RegionCardBottomSheet(
+        RegionCardDialog(
             region = uiState.selectedRegion!!,
             states = states,
             isEditing = uiState.isEditingRegion,
-            sheetState = sheetState,
             onDismiss = { viewModel.closeRegionCard() },
             onSave = { updatedRegion ->
                 viewModel.updateRegion(updatedRegion)
