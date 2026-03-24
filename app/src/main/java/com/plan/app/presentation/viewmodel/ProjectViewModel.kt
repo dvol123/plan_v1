@@ -60,9 +60,8 @@ class ProjectViewModel @Inject constructor(
     
     private val _projectId = MutableStateFlow(0L)
     
-    val regions: StateFlow<List<Region>> = _projectId.flatMap { projectId ->
-        if (projectId > 0) getRegionsUseCase(projectId) else MutableStateFlow(emptyList())
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    val regions: StateFlow<List<Region>> = getRegionsUseCase(_projectId.value)
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
     
     val states: StateFlow<List<State>> = manageStateUseCase.getAll()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -129,7 +128,6 @@ class ProjectViewModel @Inject constructor(
     fun setSearchQuery(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
         if (query.isNotBlank()) {
-            // Highlight regions matching the search
             val matchingIds = regions.value
                 .filter { it.name.contains(query, ignoreCase = true) }
                 .map { it.id }
