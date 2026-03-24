@@ -81,6 +81,10 @@
     <string name="take_photo">Сделать фото</string>
     <string name="choose_from_gallery">Выбрать из галереи</string>
     
+    <!-- Permissions -->
+    <string name="permission_required">Требуется разрешение</string>
+    <string name="camera_permission_denied">Для съёмки фото требуется разрешение камеры. Пожалуйста, предоставьте разрешение в Настройках.</string>
+    
     <!-- Common -->
     <string name="create">Создать</string>
     <string name="unsaved_changes">Есть несохранённые изменения. Сохранить перед выходом?</string>

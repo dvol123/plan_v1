@@ -81,6 +81,10 @@
     <string name="take_photo">拍照</string>
     <string name="choose_from_gallery">从相册选择</string>
     
+    <!-- Permissions -->
+    <string name="permission_required">需要权限</string>
+    <string name="camera_permission_denied">拍照功能需要相机权限。请在设置中授予权限。</string>
+    
     <!-- Common -->
     <string name="create">创建</string>
     <string name="unsaved_changes">有未保存的更改。离开前保存吗？</string>
