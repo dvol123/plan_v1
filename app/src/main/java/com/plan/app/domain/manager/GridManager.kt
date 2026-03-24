@@ -58,7 +58,8 @@ class GridManager @Inject constructor() {
         
         return if (currentSelection.contains(cell)) {
             // Can only remove the last added cell
-            if (currentSelection.last() == cell) {
+            val lastCell = currentSelection.lastOrNull()
+            if (lastCell == cell) {
                 currentSelection.remove(cell)
                 _selectedCells.value = currentSelection
                 true

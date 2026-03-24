@@ -9,11 +9,11 @@ import com.plan.app.domain.model.Content
 import com.plan.app.domain.model.Project
 import com.plan.app.domain.model.Region
 import com.plan.app.domain.model.State
-import com.plan.app.domain.usecase.GetRegionsUseCase
+import com.plan.app.domain.repository.RegionRepository
+import com.plan.app.domain.repository.StateRepository
 import com.plan.app.domain.usecase.ManageContentUseCase
 import com.plan.app.domain.usecase.ManageProjectUseCase
 import com.plan.app.domain.usecase.ManageRegionUseCase
-import com.plan.app.domain.usecase.ManageStateUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -47,10 +47,10 @@ data class ProjectUiState(
 @HiltViewModel
 class ProjectViewModel @Inject constructor(
     private val manageProjectUseCase: ManageProjectUseCase,
-    private val getRegionsUseCase: GetRegionsUseCase,
+    private val regionRepository: RegionRepository,
     private val manageRegionUseCase: ManageRegionUseCase,
     private val manageContentUseCase: ManageContentUseCase,
-    private val manageStateUseCase: ManageStateUseCase,
+    private val stateRepository: StateRepository,
     private val projectManager: ProjectManager,
     private val gridManager: GridManager
 ) : ViewModel() {
@@ -60,10 +60,10 @@ class ProjectViewModel @Inject constructor(
     
     private val _projectId = MutableStateFlow(0L)
     
-    val regions: StateFlow<List<Region>> = getRegionsUseCase(_projectId.value)
+    val regions: StateFlow<List<Region>> = regionRepository.getRegionsByProject(_projectId.value)
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
     
-    val states: StateFlow<List<State>> = manageStateUseCase.getAll()
+    val states: StateFlow<List<State>> = stateRepository.getAllStates()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
     
     val selectedCells: StateFlow<Set<Cell>> = gridManager.selectedCells
