@@ -62,6 +62,16 @@ fun MainScreen(
     var showCameraPermissionDenied by remember { mutableStateOf(false) }
     var showViewDialog by remember { mutableStateOf(false) }
     
+    // Camera launcher - must be declared before cameraPermissionLauncher
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && cameraImageUri != null) {
+            selectedPhotoUri = cameraImageUri
+            viewModel.showCreateDialog()
+        }
+    }
+    
     // Camera permission launcher
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -87,16 +97,6 @@ fun MainScreen(
     ) { uri: Uri? ->
         selectedPhotoUri = uri
         if (uri != null) {
-            viewModel.showCreateDialog()
-        }
-    }
-    
-    // Camera launcher
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success && cameraImageUri != null) {
-            selectedPhotoUri = cameraImageUri
             viewModel.showCreateDialog()
         }
     }
