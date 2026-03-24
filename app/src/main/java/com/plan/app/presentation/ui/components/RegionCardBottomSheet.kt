@@ -73,13 +73,16 @@ fun RegionCardBottomSheet(
     
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        windowInsets = WindowInsets.ime
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 16.dp)
                 .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
         ) {
             // Header
             Row(

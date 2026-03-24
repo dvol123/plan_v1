@@ -267,7 +267,7 @@ fun ProjectScreen(
                         onCellSingleTap = { cell ->
                             viewModel.onCellSingleTap(cell)
                         },
-                        isZoomEnabled = !isEditing
+                        isZoomEnabled = true // Enable zoom in both view and edit modes
                     )
                     
                     // Cell size slider in editing mode
@@ -530,21 +530,25 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGrid(
     val cellWidth = size.width / cellSize
     val cellHeight = size.height / cellSize
     
+    // Use a solid, highly visible color for the grid
+    val gridColor = Color(0xFF000000) // Solid black
+    val strokeWidth = 2f // Thicker lines for better visibility
+    
     for (i in 0..cellSize) {
         // Vertical lines
         drawLine(
-            color = Color.Gray.copy(alpha = 0.3f),
+            color = gridColor,
             start = Offset(x = i * cellWidth, y = 0f),
             end = Offset(x = i * cellWidth, y = size.height),
-            strokeWidth = 1f
+            strokeWidth = strokeWidth
         )
         
         // Horizontal lines
         drawLine(
-            color = Color.Gray.copy(alpha = 0.3f),
+            color = gridColor,
             start = Offset(x = 0f, y = i * cellHeight),
             end = Offset(x = size.width, y = i * cellHeight),
-            strokeWidth = 1f
+            strokeWidth = strokeWidth
         )
     }
 }

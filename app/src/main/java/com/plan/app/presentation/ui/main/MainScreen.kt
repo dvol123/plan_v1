@@ -300,6 +300,10 @@ fun MainScreen(
                 },
                 onViewDetailsClick = {
                     showViewDialog = true
+                },
+                onHomeDoubleTap = {
+                    // Double-tap on home deselects the project
+                    viewModel.selectProject(null)
                 }
             )
         }
@@ -354,25 +358,32 @@ fun MainScreen(
                     .fillMaxSize()
                     .background(Color.Black)
             ) {
-                IconButton(
-                    onClick = { fullscreenPhotoUri = null },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(16.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = Color.White
-                    )
-                }
-                
+                // ZoomableImage placed first (bottom layer)
                 ZoomableImage(
                     model = fullscreenPhotoUri,
                     contentDescription = "Full screen photo",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit
                 )
+                
+                // Close button placed after (top layer) so it receives touch events
+                IconButton(
+                    onClick = { fullscreenPhotoUri = null },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                        .background(
+                            color = Color.Black.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(50)
+                        )
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
         }
     }
@@ -398,8 +409,7 @@ fun MainScreen(
                         )
                     )
                     selectedPhotoUri = null
-                    // Navigate to project screen in editing mode
-                    projects.lastOrNull()?.let { onProjectClick(it.id) }
+                    // Stay on first screen after creating project (as per user requirement)
                 }
             }
         )
@@ -528,18 +538,29 @@ private fun ProjectListItem(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MainBottomBar(
     selectedProject: Project?,
     onViewClick: () -> Unit,
     onEditClick: () -> Unit,
-    onViewDetailsClick: () -> Unit
+    onViewDetailsClick: () -> Unit,
+    onHomeDoubleTap: () -> Unit
 ) {
     NavigationBar {
         NavigationBarItem(
             selected = true,
-            onClick = { /* Already on main screen */ },
-            icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+            onClick = { /* Single tap - already on main screen */ },
+            icon = { 
+                Box(
+                    modifier = Modifier.combinedClickable(
+                        onClick = { /* Single tap - already on main screen */ },
+                        onDoubleClick = onHomeDoubleTap
+                    )
+                ) {
+                    Icon(Icons.Default.Home, contentDescription = "Home")
+                }
+            },
             label = { Text(stringResource(R.string.home)) }
         )
         NavigationBarItem(
