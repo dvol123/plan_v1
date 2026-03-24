@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -187,7 +188,12 @@ fun MainScreen(
                                 showAddMenu = false
                                 // Create temp file for camera image
                                 val tempFile = File(context.cacheDir, "camera_${System.currentTimeMillis()}.jpg")
-                                cameraImageUri = Uri.fromFile(tempFile)
+                                // Use FileProvider for Android 7.0+ compatibility
+                                cameraImageUri = FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.fileprovider",
+                                    tempFile
+                                )
                                 cameraLauncher.launch(cameraImageUri)
                             },
                             text = {
