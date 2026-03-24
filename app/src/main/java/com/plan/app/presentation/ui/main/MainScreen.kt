@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -31,7 +32,10 @@ import coil.request.ImageRequest
 import com.plan.app.R
 import com.plan.app.domain.model.Project
 import com.plan.app.presentation.viewmodel.MainViewModel
-import com.plan.app.presentation.ui.components.*
+import com.plan.app.presentation.ui.components.SettingsDialog
+import com.plan.app.presentation.ui.components.CreateProjectDialog
+import com.plan.app.presentation.ui.components.EditProjectDialog
+import com.plan.app.presentation.ui.components.ZoomableImage
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,53 +98,83 @@ fun MainScreen(
                         onDismissRequest = { showMenu = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.add)) },
                             onClick = {
                                 showMenu = false
                                 showAddMenu = true
                             },
-                            leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) }
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.add))
+                                }
+                            }
                         )
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.import_project)) },
                             onClick = {
                                 showMenu = false
                                 // TODO: Implement import
                             },
-                            leadingIcon = { Icon(Icons.Default.FileDownload, contentDescription = null) }
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.import_project))
+                                }
+                            }
                         )
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.share)) },
                             onClick = {
                                 showMenu = false
                                 // TODO: Implement share
                             },
-                            leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) }
-                        }
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.share))
+                                }
+                            }
+                        )
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.export_project)) },
                             onClick = {
                                 showMenu = false
                                 viewModel.showExportDialog()
                             },
-                            leadingIcon = { Icon(Icons.Default.FileUpload, contentDescription = null) }
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.export_project))
+                                }
+                            }
                         )
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.settings)) },
                             onClick = {
                                 showMenu = false
                                 viewModel.showSettingsDialog()
                             },
-                            leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
-                        }
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.settings))
+                                }
+                            }
+                        )
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.exit)) },
                             onClick = {
                                 showMenu = false
                                 // TODO: Implement exit with confirmation
                             },
-                            leadingIcon = { Icon(Icons.Default.ExitToApp, contentDescription = null) }
-                        }
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.exit))
+                                }
+                            }
+                        )
                     }
                     
                     // Add submenu for camera/gallery
@@ -149,7 +183,6 @@ fun MainScreen(
                         onDismissRequest = { showAddMenu = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.take_photo)) },
                             onClick = {
                                 showAddMenu = false
                                 // Create temp file for camera image
@@ -157,15 +190,26 @@ fun MainScreen(
                                 cameraImageUri = Uri.fromFile(tempFile)
                                 cameraLauncher.launch(cameraImageUri)
                             },
-                            leadingIcon = { Icon(Icons.Default.CameraAlt, contentDescription = null) }
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Camera, contentDescription = null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.take_photo))
+                                }
+                            }
                         )
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.choose_from_gallery)) },
                             onClick = {
                                 showAddMenu = false
                                 photoPickerLauncher.launch("image/*")
                             },
-                            leadingIcon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) }
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.choose_from_gallery))
+                                }
+                            }
                         )
                     }
                 }
@@ -248,7 +292,7 @@ fun MainScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.black)
+                    .background(Color.Black)
             ) {
                 IconButton(
                     onClick = { fullscreenPhotoUri = null },
@@ -259,7 +303,7 @@ fun MainScreen(
                     Icon(
                         Icons.Default.Close,
                         contentDescription = "Close",
-                        tint = MaterialTheme.colorScheme.white
+                        tint = Color.White
                     )
                 }
                 
@@ -487,11 +531,3 @@ private fun MainBottomBar(
         )
     }
 }
-
-// Extension property for black color
-private val MaterialTheme.colorScheme.black
-    get() = androidx.compose.ui.graphics.Color.Black
-
-// Extension property for white color
-private val MaterialTheme.colorScheme.white
-    get() = androidx.compose.ui.graphics.Color.White

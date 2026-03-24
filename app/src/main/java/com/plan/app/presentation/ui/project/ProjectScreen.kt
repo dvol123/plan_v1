@@ -142,49 +142,73 @@ fun ProjectScreen(
                         onDismissRequest = { showMenu = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.edit)) },
                             onClick = {
                                 showMenu = false
                                 viewModel.toggleEditMode()
                             },
-                            leadingIcon = { 
-                                Icon(
-                                    if (isEditing) Icons.Default.Visibility else Icons.Default.Edit, 
-                                    contentDescription = null
-                                ) 
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        if (isEditing) Icons.Default.Visibility else Icons.Default.Edit,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.edit))
+                                }
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.export_project)) },
                             onClick = {
                                 showMenu = false
                                 // TODO: Export for PC
                             },
-                            leadingIcon = { Icon(Icons.Default.FileUpload, contentDescription = null) }
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.export_project))
+                                }
+                            }
                         )
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.share)) },
                             onClick = {
                                 showMenu = false
                                 // TODO: Share via Wi-Fi/Bluetooth
                             },
-                            leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) }
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.share))
+                                }
+                            }
                         )
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.delete)) },
                             onClick = {
                                 showMenu = false
                                 viewModel.showDeleteConfirm()
                             },
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) }
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.delete))
+                                }
+                            }
                         )
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.clear)) },
                             onClick = {
                                 showMenu = false
                                 viewModel.showClearConfirm()
                             },
-                            leadingIcon = { Icon(Icons.Default.Clear, contentDescription = null) }
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.clear))
+                                }
+                            }
                         )
                     }
                 }
