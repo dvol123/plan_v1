@@ -258,7 +258,7 @@ class ExportManager @Inject constructor(
                 states.find { it.id == stateId }
             }
             
-            val color = state?.color?.let { Color(it) } ?: Color.GRAY
+            val color = state?.color ?: Color.GRAY
             fillPaint.color = color
             
             for (cell in region.cells) {

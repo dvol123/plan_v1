@@ -711,9 +711,8 @@ private fun FullscreenMediaViewer(
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
-            usePlatformDefaultWidth = false,
             dismissOnBackPress = true,
-            dismissOnClickOutsideConstraint = true
+            dismissOnClickOutside = true
         )
     ) {
         Box(
