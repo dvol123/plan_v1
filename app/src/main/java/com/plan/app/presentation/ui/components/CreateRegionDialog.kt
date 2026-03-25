@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -30,7 +31,7 @@ fun CreateRegionDialog(
     states: List<State>,
     onDismiss: () -> Unit,
     onCreate: (name: String, stateId: Long?, type1: String?, type2: String?, description: String?, note: String?) -> Unit,
-    onCreateState: (String, Int) -> Unit = { _, _ -> }
+    onCreateState: (String, Int, (State) -> Unit) -> Unit = { _, _, _ -> }
 ) {
     var name by remember { mutableStateOf("") }
     var selectedStateId by remember { mutableStateOf<Long?>(null) }
@@ -39,6 +40,7 @@ fun CreateRegionDialog(
     var description by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var nameError by remember { mutableStateOf(false) }
+    var showCreateStateDialog by remember { mutableStateOf(false) }
     
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -74,9 +76,9 @@ fun CreateRegionDialog(
                     singleLine = true
                 )
                 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 
-                // State selector
+                // State selector - separate field above types
                 Text(
                     text = stringResource(R.string.state),
                     style = MaterialTheme.typography.labelMedium
@@ -85,14 +87,68 @@ fun CreateRegionDialog(
                 Spacer(modifier = Modifier.height(4.dp))
                 
                 // State chips with create button
-                CreateRegionStateSelector(
-                    states = states,
-                    selectedStateId = selectedStateId,
-                    onStateSelected = { selectedStateId = it },
-                    onCreateState = onCreateState
-                )
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    states.forEach { state ->
+                        FilterChip(
+                            selected = selectedStateId == state.id,
+                            onClick = { 
+                                selectedStateId = if (selectedStateId == state.id) null else state.id
+                            },
+                            label = { Text(state.name) },
+                            leadingIcon = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color(state.color))
+                                )
+                            }
+                        )
+                    }
+                    
+                    // Create new state button
+                    FilterChip(
+                        selected = false,
+                        onClick = { showCreateStateDialog = true },
+                        label = { Text(stringResource(R.string.new_state)) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+                    )
+                }
                 
-                Spacer(modifier = Modifier.height(8.dp))
+                // Show selected state info with color preview
+                val selectedState = states.find { it.id == selectedStateId }
+                if (selectedState != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(selectedState.color).copy(alpha = 0.2f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color(selectedState.color))
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.selected_state, selectedState.name),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
                 
                 // Type 1
                 OutlinedTextField(
@@ -171,123 +227,22 @@ fun CreateRegionDialog(
             }
         }
     }
-}
-
-@Composable
-private fun CreateRegionStateSelector(
-    states: List<State>,
-    selectedStateId: Long?,
-    onStateSelected: (Long?) -> Unit,
-    onCreateState: (String, Int) -> Unit
-) {
-    var showCreateDialog by remember { mutableStateOf(false) }
-    var newStateName by remember { mutableStateOf("") }
-    var selectedColorIndex by remember { mutableStateOf(0) }
-    
-    Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        states.forEach { state ->
-            FilterChip(
-                selected = selectedStateId == state.id,
-                onClick = { 
-                    onStateSelected(if (selectedStateId == state.id) null else state.id)
-                },
-                label = { Text(state.name) },
-                leadingIcon = {
-                    Box(
-                        modifier = Modifier
-                            .size(16.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(state.color))
-                    )
-                }
-            )
-        }
-        
-        // Create new state button
-        FilterChip(
-            selected = false,
-            onClick = { showCreateDialog = true },
-            label = { Text(stringResource(R.string.new_state)) },
-            leadingIcon = {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-            }
-        )
-    }
     
     // Create state dialog
-    if (showCreateDialog) {
-        AlertDialog(
-            onDismissRequest = { showCreateDialog = false },
-            title = { Text(stringResource(R.string.create_state)) },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = newStateName,
-                        onValueChange = { newStateName = it },
-                        label = { Text(stringResource(R.string.state_name)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Text(
-                        text = stringResource(R.string.select_color),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        State.PREDEFINED_COLORS.forEachIndexed { index, color ->
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(color))
-                                    .clickable { selectedColorIndex = index }
-                                    .then(
-                                        if (selectedColorIndex == index) {
-                                            Modifier.padding(4.dp)
-                                        } else Modifier
-                                    )
-                            ) {
-                                if (selectedColorIndex == index) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = "Selected",
-                                        tint = Color.White,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(4.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
+    if (showCreateStateDialog) {
+        CreateStateDialog(
+            existingStates = states,
+            onDismiss = { showCreateStateDialog = false },
+            onCreate = { stateName, color ->
+                // Create state and auto-select it
+                onCreateState(stateName, color) { newState ->
+                    selectedStateId = newState.id
                 }
+                showCreateStateDialog = false
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (newStateName.isNotBlank()) {
-                        onCreateState(newStateName, State.PREDEFINED_COLORS[selectedColorIndex])
-                        showCreateDialog = false
-                        newStateName = ""
-                    }
-                }) {
-                    Text(stringResource(R.string.create))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateDialog = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
+            onSelectExisting = { state ->
+                selectedStateId = state.id
+                showCreateStateDialog = false
             }
         )
     }

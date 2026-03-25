@@ -419,10 +419,8 @@ fun ProjectScreen(
             onCreate = { name, stateId, type1, type2, description, note ->
                 viewModel.createRegion(name, stateId, type1, type2, description, note)
             },
-            onCreateState = { name, color ->
-                viewModel.createState(name, color) { newState ->
-                    // State will appear in list automatically via Flow
-                }
+            onCreateState = { name, color, onCreated ->
+                viewModel.createState(name, color, onCreated)
             }
         )
     }

@@ -54,9 +54,11 @@
     
     <!-- Region -->
     <string name="create_region">Create Region</string>
+    <string name="create_region_title">Create New Region</string>
     <string name="edit_region">Edit Region</string>
     <string name="region_details">Region Details</string>
     <string name="region_name">Region Name</string>
+    <string name="region_name_hint">Enter region name</string>
     <string name="state">State</string>
     <string name="state_name">State Name</string>
     <string name="new_state">New State</string>
@@ -65,6 +67,10 @@
     <string name="state_already_exists">State with this name already exists</string>
     <string name="existing_states">Existing states:</string>
     <string name="select">Select</string>
+    <string name="selected_state">Selected: %s</string>
+    <string name="field_required">This field is required</string>
+    <string name="description">Description</string>
+    <string name="note">Note</string>
     
     <!-- Regions -->
     <string name="clear_regions">Clear Regions</string>
