@@ -356,8 +356,11 @@ class ProjectViewModel @Inject constructor(
     fun addPhotoToRegion(context: Context, regionId: Long, uri: Uri) {
         viewModelScope.launch {
             try {
+                android.util.Log.d("ProjectViewModel", "Adding photo to region $regionId, uri: $uri")
+                
                 // Copy file to app's permanent storage
                 val savedPath = copyMediaToPermanentStorage(context, uri, regionId, "photo")
+                android.util.Log.d("ProjectViewModel", "Photo saved to: $savedPath")
                 
                 // Get next sort order
                 val sortOrder = manageContentUseCase.getByRegionOnce(regionId).size
@@ -369,11 +372,14 @@ class ProjectViewModel @Inject constructor(
                     data = savedPath,
                     sortOrder = sortOrder
                 )
-                manageContentUseCase.add(content)
+                val contentId = manageContentUseCase.add(content)
+                android.util.Log.d("ProjectViewModel", "Content inserted with id: $contentId")
                 
                 // Refresh the selected region
                 refreshSelectedRegion()
+                android.util.Log.d("ProjectViewModel", "Region refreshed, contents count: ${_uiState.value.selectedRegion?.contents?.size}")
             } catch (e: Exception) {
+                android.util.Log.e("ProjectViewModel", "Failed to save photo", e)
                 _uiState.value = _uiState.value.copy(errorMessage = "Failed to save photo: ${e.message}")
             }
         }
@@ -382,8 +388,11 @@ class ProjectViewModel @Inject constructor(
     fun addVideoToRegion(context: Context, regionId: Long, uri: Uri) {
         viewModelScope.launch {
             try {
+                android.util.Log.d("ProjectViewModel", "Adding video to region $regionId, uri: $uri")
+                
                 // Copy file to app's permanent storage
                 val savedPath = copyMediaToPermanentStorage(context, uri, regionId, "video")
+                android.util.Log.d("ProjectViewModel", "Video saved to: $savedPath")
                 
                 // Get next sort order
                 val sortOrder = manageContentUseCase.getByRegionOnce(regionId).size
@@ -395,11 +404,14 @@ class ProjectViewModel @Inject constructor(
                     data = savedPath,
                     sortOrder = sortOrder
                 )
-                manageContentUseCase.add(content)
+                val contentId = manageContentUseCase.add(content)
+                android.util.Log.d("ProjectViewModel", "Content inserted with id: $contentId")
                 
                 // Refresh the selected region
                 refreshSelectedRegion()
+                android.util.Log.d("ProjectViewModel", "Region refreshed, contents count: ${_uiState.value.selectedRegion?.contents?.size}")
             } catch (e: Exception) {
+                android.util.Log.e("ProjectViewModel", "Failed to save video", e)
                 _uiState.value = _uiState.value.copy(errorMessage = "Failed to save video: ${e.message}")
             }
         }
@@ -407,9 +419,13 @@ class ProjectViewModel @Inject constructor(
     
     private suspend fun refreshSelectedRegion() {
         _uiState.value.selectedRegion?.let { currentRegion ->
+            android.util.Log.d("ProjectViewModel", "Refreshing region ${currentRegion.id}")
             val updatedRegion = regionRepository.getRegionById(currentRegion.id)
             if (updatedRegion != null) {
+                android.util.Log.d("ProjectViewModel", "Updated region contents: ${updatedRegion.contents.size}")
                 _uiState.value = _uiState.value.copy(selectedRegion = updatedRegion)
+            } else {
+                android.util.Log.w("ProjectViewModel", "Updated region is null!")
             }
         }
     }

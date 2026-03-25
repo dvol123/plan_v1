@@ -73,6 +73,7 @@ class RegionRepositoryImpl @Inject constructor(
         
         // Load contents for this region
         val contentEntities = contentDao.getContentsByRegionOnce(id)
+        android.util.Log.d("RegionRepository", "Loaded ${contentEntities.size} contents for region $id")
         val contents = contentEntities.map { it.toDomain() }
         
         return Region(
