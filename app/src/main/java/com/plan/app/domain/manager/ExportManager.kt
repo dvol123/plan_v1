@@ -567,4 +567,112 @@ class ExportManager @Inject constructor(
             }
         }
     }
+    
+    /**
+     * Export project as HTML report in ZIP file (for viewing on PC).
+     */
+    suspend fun exportForPCToZip(project: Project, outputFile: File): ZipExportResult {
+        return withContext(Dispatchers.IO) {
+            try {
+                val tempDir = File(context.cacheDir, "export_pc_${System.currentTimeMillis()}")
+                tempDir.mkdirs()
+                
+                val regions = regionRepository.getRegionsByProjectOnce(project.id)
+                val states = stateRepository.getAllStatesOnce()
+                
+                // Create photo with areas overlay
+                val photoFile = getFileFromUri(project.photoUri)
+                if (photoFile != null && photoFile.exists()) {
+                    val bitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
+                    if (bitmap != null) {
+                        val photoWithAreas = drawRegionsOnBitmap(bitmap, regions, states, project.cellSize)
+                        File(tempDir, "photo_with_areas.jpg").writeBytes(
+                            compressBitmap(photoWithAreas, Bitmap.CompressFormat.JPEG, 90)
+                        )
+                        bitmap.recycle()
+                        photoWithAreas.recycle()
+                    }
+                }
+                
+                // Create HTML report
+                val htmlContent = generateHtmlReport(project, regions, states)
+                File(tempDir, "report.html").writeText(htmlContent)
+                
+                // Copy media files for each region
+                for (region in regions) {
+                    val safeName = region.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
+                    val regionDir = File(tempDir, safeName)
+                    regionDir.mkdirs()
+                    
+                    val contents = contentRepository.getContentsByRegionOnce(region.id)
+                    for ((index, content) in contents.withIndex()) {
+                        when (content.type) {
+                            ContentType.TEXT -> {
+                                File(regionDir, "comment.txt").writeText(content.data)
+                            }
+                            ContentType.PHOTO -> {
+                                val sourceFile = getFileFromUri(content.data)
+                                if (sourceFile != null && sourceFile.exists()) {
+                                    sourceFile.copyTo(File(regionDir, "photo_$index.jpg"), overwrite = true)
+                                }
+                            }
+                            ContentType.VIDEO -> {
+                                val sourceFile = getFileFromUri(content.data)
+                                if (sourceFile != null && sourceFile.exists()) {
+                                    sourceFile.copyTo(File(regionDir, "video_$index.mp4"), overwrite = true)
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Pack everything into ZIP
+                ZipOutputStream(java.io.BufferedOutputStream(java.io.FileOutputStream(outputFile))).use { zip ->
+                    tempDir.walkTopDown().forEach { file ->
+                        if (file.isFile) {
+                            val relativePath = file.relativeTo(tempDir).path.replace("\\", "/")
+                            addFileToZip(zip, relativePath, file)
+                        }
+                    }
+                }
+                
+                // Cleanup temp directory
+                tempDir.deleteRecursively()
+                
+                ZipExportResult(success = true, file = outputFile)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                ZipExportResult(success = false, error = e.message)
+            }
+        }
+    }
+    
+    /**
+     * Export all projects as HTML reports in a single ZIP file (for viewing on PC).
+     */
+    suspend fun exportAllProjectsForPC(outputFile: File): ZipExportResult {
+        return withContext(Dispatchers.IO) {
+            try {
+                val projects = projectRepository.getAllProjectsOnce()
+                
+                ZipOutputStream(java.io.BufferedOutputStream(java.io.FileOutputStream(outputFile))).use { zip ->
+                    for (project in projects) {
+                        val projectZipFile = File.createTempFile("project_pc_", ".zip", context.cacheDir)
+                        val result = exportForPCToZip(project, projectZipFile)
+                        
+                        if (result.success) {
+                            val safeName = project.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
+                            addFileToZip(zip, "projects/${safeName}_${project.id}.zip", projectZipFile)
+                            projectZipFile.delete()
+                        }
+                    }
+                }
+                
+                ZipExportResult(success = true, file = outputFile)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                ZipExportResult(success = false, error = e.message)
+            }
+        }
+    }
 }

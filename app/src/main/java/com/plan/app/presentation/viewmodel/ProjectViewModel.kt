@@ -454,6 +454,31 @@ class ProjectViewModel @Inject constructor(
     }
     
     // Export operations
+    // Export as HTML report in ZIP (for viewing on PC)
+    fun exportProjectForPC(outputFile: java.io.File, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val project = _uiState.value.project ?: return@launch
+                val result = exportManager.exportForPCToZip(project, outputFile)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = result.success,
+                    exportMessage = if (result.success) "Export successful" else result.error
+                )
+                onComplete(result.success, result.error)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = false,
+                    exportMessage = e.message
+                )
+                onComplete(false, e.message)
+            }
+        }
+    }
+    
+    // Export as JSON in ZIP (for sharing/importing on another device)
     fun exportProjectToZip(outputFile: java.io.File, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
@@ -473,29 +498,6 @@ class ProjectViewModel @Inject constructor(
                     exportMessage = e.message
                 )
                 onComplete(false, e.message)
-            }
-        }
-    }
-    
-    fun exportProjectForPC(outputDir: java.io.File, onComplete: (Boolean) -> Unit = {}) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            try {
-                val project = _uiState.value.project ?: return@launch
-                val result = exportManager.exportForPC(project, outputDir)
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    exportSuccess = result,
-                    exportMessage = if (result) "Export successful" else "Export failed"
-                )
-                onComplete(result)
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    exportSuccess = false,
-                    exportMessage = e.message
-                )
-                onComplete(false)
             }
         }
     }

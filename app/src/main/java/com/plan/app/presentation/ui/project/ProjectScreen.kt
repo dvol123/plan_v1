@@ -96,18 +96,49 @@ fun ProjectScreen(
         }
     }
     
-    // Export launcher
+    // Export launcher - creates HTML report in ZIP (for viewing on PC)
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
         uri?.let {
             context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                val tempFile = File(context.cacheDir, "temp_export.zip")
+                val tempFile = File(context.cacheDir, "temp_export_html.zip")
+                viewModel.exportProjectForPC(tempFile) { success, _ ->
+                    if (success) {
+                        tempFile.inputStream().use { input ->
+                            input.copyTo(outputStream)
+                        }
+                    }
+                    tempFile.delete()
+                }
+            }
+        }
+    }
+    
+    // Share launcher - creates JSON ZIP for importing on another device
+    val shareLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri ->
+        uri?.let {
+            context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                val tempFile = File(context.cacheDir, "temp_share.zip")
                 viewModel.exportProjectToZip(tempFile) { success, _ ->
                     if (success) {
                         tempFile.inputStream().use { input ->
                             input.copyTo(outputStream)
                         }
+                        // Share the file
+                        val shareUri = androidx.core.content.FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            tempFile
+                        )
+                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "application/zip"
+                            putExtra(android.content.Intent.EXTRA_STREAM, shareUri)
+                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share)))
                     }
                     tempFile.delete()
                 }
@@ -253,7 +284,7 @@ fun ProjectScreen(
                             onClick = {
                                 showMenu = false
                                 uiState.project?.let { project ->
-                                    exportLauncher.launch("${project.name}.zip")
+                                    exportLauncher.launch("${project.name}_report.zip")
                                 }
                             },
                             text = {
@@ -268,7 +299,7 @@ fun ProjectScreen(
                             onClick = {
                                 showMenu = false
                                 uiState.project?.let { project ->
-                                    exportLauncher.launch("${project.name}_share.zip")
+                                    shareLauncher.launch("${project.name}_share.zip")
                                 }
                             },
                             text = {

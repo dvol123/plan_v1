@@ -161,7 +161,7 @@ class MainViewModel @Inject constructor(
         }
     }
     
-    // Export selected project to ZIP
+    // Export selected project to ZIP (for sharing - JSON format)
     fun exportProjectToZip(context: Context, outputFile: File, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
@@ -195,12 +195,69 @@ class MainViewModel @Inject constructor(
         }
     }
     
-    // Export all projects to ZIP
+    // Export project as HTML report in ZIP (for viewing on PC)
+    fun exportProjectForPC(outputFile: File, project: Project? = null, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val targetProject = project ?: _uiState.value.selectedProject
+                if (targetProject == null) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        exportSuccess = false,
+                        exportMessage = "No project selected"
+                    )
+                    onComplete(false, "No project selected")
+                    return@launch
+                }
+                
+                val result = exportManager.exportForPCToZip(targetProject, outputFile)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = result.success,
+                    exportMessage = if (result.success) "Export successful" else result.error
+                )
+                onComplete(result.success, result.error)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = false,
+                    exportMessage = e.message
+                )
+                onComplete(false, e.message)
+            }
+        }
+    }
+    
+    // Export all projects to ZIP (JSON format for sharing)
     fun exportAllProjects(outputFile: File, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val result = exportManager.exportAllProjects(outputFile)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = result.success,
+                    exportMessage = if (result.success) "Export successful" else result.error
+                )
+                onComplete(result.success, result.error)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = false,
+                    exportMessage = e.message
+                )
+                onComplete(false, e.message)
+            }
+        }
+    }
+    
+    // Export all projects as HTML reports in ZIP (for viewing on PC)
+    fun exportAllProjectsForPC(outputFile: File, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val result = exportManager.exportAllProjectsForPC(outputFile)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     exportSuccess = result.success,

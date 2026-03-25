@@ -116,13 +116,13 @@ fun MainScreen(
         }
     }
     
-    // Export launcher - for single project
+    // Export launcher - creates HTML report in ZIP (for viewing on PC)
     val exportProjectLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri: Uri? ->
         uri?.let {
-            val tempFile = File(context.cacheDir, "export_temp.zip")
-            viewModel.exportProjectToZip(context, tempFile) { success, error ->
+            val tempFile = File(context.cacheDir, "export_html_temp.zip")
+            viewModel.exportProjectForPC(tempFile) { success, error ->
                 if (success) {
                     context.contentResolver.openOutputStream(uri)?.use { output ->
                         tempFile.inputStream().use { input ->
@@ -138,13 +138,13 @@ fun MainScreen(
         }
     }
     
-    // Export all launcher
+    // Export all launcher - creates HTML reports for all projects
     val exportAllLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri: Uri? ->
         uri?.let {
-            val tempFile = File(context.cacheDir, "export_all_temp.zip")
-            viewModel.exportAllProjects(tempFile) { success, error ->
+            val tempFile = File(context.cacheDir, "export_all_html_temp.zip")
+            viewModel.exportAllProjectsForPC(tempFile) { success, error ->
                 if (success) {
                     context.contentResolver.openOutputStream(uri)?.use { output ->
                         tempFile.inputStream().use { input ->
@@ -160,7 +160,7 @@ fun MainScreen(
         }
     }
     
-    // Share launcher
+    // Share launcher - creates JSON ZIP for importing on another device
     val shareLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri: Uri? ->
