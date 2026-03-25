@@ -101,16 +101,16 @@ fun ProjectScreen(
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
         uri?.let {
-            context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                val tempFile = File(context.cacheDir, "temp_export_html.zip")
-                viewModel.exportProjectForPC(tempFile) { success, _ ->
-                    if (success) {
+            val tempFile = File(context.cacheDir, "temp_export_html.zip")
+            viewModel.exportProjectForPC(tempFile) { success, _ ->
+                if (success) {
+                    context.contentResolver.openOutputStream(it)?.use { outputStream ->
                         tempFile.inputStream().use { input ->
                             input.copyTo(outputStream)
                         }
                     }
-                    tempFile.delete()
                 }
+                tempFile.delete()
             }
         }
     }
@@ -120,28 +120,28 @@ fun ProjectScreen(
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
         uri?.let {
-            context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                val tempFile = File(context.cacheDir, "temp_share.zip")
-                viewModel.exportProjectToZip(tempFile) { success, _ ->
-                    if (success) {
+            val tempFile = File(context.cacheDir, "temp_share.zip")
+            viewModel.exportProjectToZip(tempFile) { success, _ ->
+                if (success) {
+                    context.contentResolver.openOutputStream(it)?.use { outputStream ->
                         tempFile.inputStream().use { input ->
                             input.copyTo(outputStream)
                         }
-                        // Share the file
-                        val shareUri = androidx.core.content.FileProvider.getUriForFile(
-                            context,
-                            "${context.packageName}.fileprovider",
-                            tempFile
-                        )
-                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                            type = "application/zip"
-                            putExtra(android.content.Intent.EXTRA_STREAM, shareUri)
-                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share)))
                     }
-                    tempFile.delete()
+                    // Share the file
+                    val shareUri = androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        tempFile
+                    )
+                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "application/zip"
+                        putExtra(android.content.Intent.EXTRA_STREAM, shareUri)
+                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share)))
                 }
+                tempFile.delete()
             }
         }
     }
