@@ -42,10 +42,13 @@
     <!-- Project Screen -->
     <string name="loading">Загрузка…</string>
     <string name="editing_mode">Режим редактирования</string>
+    <string name="view_mode">Режим просмотра</string>
+    <string name="edit_mode">Режим редактирования</string>
     <string name="search_regions">Поиск областей</string>
     
     <!-- Grid -->
     <string name="cell_size">Размер ячейки</string>
+    <string name="grid_locked_info">Размер сетки заблокирован при наличии областей</string>
     <string name="warning">Предупреждение</string>
     <string name="cell_size_change_warning">Изменение размера ячейки удалит все существующие области. Продолжить?</string>
     

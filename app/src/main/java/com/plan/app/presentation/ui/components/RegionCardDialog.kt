@@ -1,8 +1,11 @@
 package com.plan.app.presentation.ui.components
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -30,6 +33,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
+import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.plan.app.R
@@ -37,9 +45,7 @@ import com.plan.app.domain.model.Content
 import com.plan.app.domain.model.ContentType
 import com.plan.app.domain.model.Region
 import com.plan.app.domain.model.State
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
-import androidx.compose.ui.viewinterop.AndroidView
+import java.io.File
 
 /**
  * Dialog for displaying and editing region details.
@@ -65,26 +71,83 @@ fun RegionCardDialog(
     var description by remember { mutableStateOf(region.description ?: "") }
     var note by remember { mutableStateOf(region.note ?: "") }
     
+    var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
+    var cameraVideoUri by remember { mutableStateOf<Uri?>(null) }
+    var showCameraPermissionDenied by remember { mutableStateOf(false) }
+    var pendingMediaType by remember { mutableStateOf<MediaType?>(null) }
+    
     // Fullscreen media viewer state
     var showFullscreenMedia by remember { mutableStateOf(false) }
     var selectedMediaIndex by remember { mutableStateOf(0) }
     
-    // Media picker launchers
-    val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let { onAddPhoto(it) }
-    }
-    
-    val videoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let { onAddVideo(it) }
-    }
-    
     // Get media contents
     val mediaContents = remember(region.contents) {
         region.contents.filter { it.type == ContentType.PHOTO || it.type == ContentType.VIDEO }
+    }
+    
+    // Camera launcher for photos
+    val photoCameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && cameraImageUri != null) {
+            onAddPhoto(cameraImageUri!!)
+        }
+    }
+    
+    // Camera launcher for videos
+    val videoCameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CaptureVideo()
+    ) { success ->
+        if (success && cameraVideoUri != null) {
+            onAddVideo(cameraVideoUri!!)
+        }
+    }
+    
+    // Camera permission launcher
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            // Permission granted, launch appropriate camera
+            when (pendingMediaType) {
+                MediaType.PHOTO -> {
+                    val tempFile = File(context.cacheDir, "photo_${System.currentTimeMillis()}.jpg")
+                    cameraImageUri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        tempFile
+                    )
+                    cameraImageUri?.let { photoCameraLauncher.launch(it) }
+                }
+                MediaType.VIDEO -> {
+                    val tempFile = File(context.cacheDir, "video_${System.currentTimeMillis()}.mp4")
+                    cameraVideoUri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        tempFile
+                    )
+                    cameraVideoUri?.let { videoCameraLauncher.launch(it) }
+                }
+                null -> {}
+            }
+        } else {
+            showCameraPermissionDenied = true
+        }
+        pendingMediaType = null
+    }
+    
+    // Camera permission denied dialog
+    if (showCameraPermissionDenied) {
+        AlertDialog(
+            onDismissRequest = { showCameraPermissionDenied = false },
+            title = { Text(stringResource(R.string.permission_required)) },
+            text = { Text(stringResource(R.string.camera_permission_denied)) },
+            confirmButton = {
+                TextButton(onClick = { showCameraPermissionDenied = false }) {
+                    Text(stringResource(R.string.ok))
+                }
+            }
+        )
     }
     
     Dialog(
@@ -132,7 +195,7 @@ fun RegionCardDialog(
                         .padding(horizontal = 16.dp)
                         .padding(top = 16.dp)
                 ) {
-                    // Media gallery carousel at the top
+                    // Media gallery carousel
                     MediaGallerySection(
                         mediaContents = mediaContents,
                         isEditing = isEditing,
@@ -140,8 +203,40 @@ fun RegionCardDialog(
                             selectedMediaIndex = index
                             showFullscreenMedia = true
                         },
-                        onAddPhoto = { photoPicker.launch("image/*") },
-                        onAddVideo = { videoPicker.launch("video/*") }
+                        onAddPhoto = {
+                            pendingMediaType = MediaType.PHOTO
+                            when (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)) {
+                                PackageManager.PERMISSION_GRANTED -> {
+                                    val tempFile = File(context.cacheDir, "photo_${System.currentTimeMillis()}.jpg")
+                                    cameraImageUri = FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.fileprovider",
+                                        tempFile
+                                    )
+                                    cameraImageUri?.let { photoCameraLauncher.launch(it) }
+                                }
+                                else -> {
+                                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                }
+                            }
+                        },
+                        onAddVideo = {
+                            pendingMediaType = MediaType.VIDEO
+                            when (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)) {
+                                PackageManager.PERMISSION_GRANTED -> {
+                                    val tempFile = File(context.cacheDir, "video_${System.currentTimeMillis()}.mp4")
+                                    cameraVideoUri = FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.fileprovider",
+                                        tempFile
+                                    )
+                                    cameraVideoUri?.let { videoCameraLauncher.launch(it) }
+                                }
+                                else -> {
+                                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                }
+                            }
+                        }
                     )
                     
                     Spacer(modifier = Modifier.height(16.dp))
@@ -747,4 +842,12 @@ private fun FullscreenMediaViewer(
             }
         }
     }
+}
+
+/**
+ * Enum for tracking pending media type when requesting camera permission
+ */
+private enum class MediaType {
+    PHOTO,
+    VIDEO
 }

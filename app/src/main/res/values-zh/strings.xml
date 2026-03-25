@@ -42,10 +42,13 @@
     <!-- Project Screen -->
     <string name="loading">加载中…</string>
     <string name="editing_mode">编辑模式</string>
+    <string name="view_mode">查看模式</string>
+    <string name="edit_mode">编辑模式</string>
     <string name="search_regions">搜索区域</string>
     
     <!-- Grid -->
     <string name="cell_size">单元格大小</string>
+    <string name="grid_locked_info">存在区域时网格大小被锁定</string>
     <string name="warning">警告</string>
     <string name="cell_size_change_warning">更改单元格大小将删除所有现有区域。确定继续吗？</string>
     
