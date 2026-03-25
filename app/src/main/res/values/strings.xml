@@ -48,6 +48,7 @@
     
     <!-- Grid -->
     <string name="cell_size">Cell Size</string>
+    <string name="grid_locked_info">Grid size is locked when regions exist</string>
     <string name="warning">Warning</string>
     <string name="cell_size_change_warning">Changing cell size will delete all existing regions. Continue?</string>
     

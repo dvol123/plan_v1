@@ -86,190 +86,147 @@ fun ProjectScreen(
     
     Scaffold(
         topBar = {
-            // Header with project name on top, search and menu below
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
-            ) {
-                // Top row: project name with back button
-                TopAppBar(
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
+            TopAppBar(
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = uiState.project?.name ?: stringResource(R.string.loading),
+                            maxLines = 1,
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isEditing) {
                             Text(
-                                text = uiState.project?.name ?: stringResource(R.string.loading),
-                                maxLines = 1,
-                                style = MaterialTheme.typography.titleLarge,
-                                modifier = Modifier.weight(1f)
+                                text = stringResource(R.string.editing_mode),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
                             )
-                            if (isEditing) {
-                                Text(
-                                    text = stringResource(R.string.editing_mode),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                        }
-                    },
-                    actions = {
-                        // Menu button also visible in editing mode
-                        IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Menu")
                         }
                     }
-                )
-                
-                // Bottom row: search bar and menu button (like first screen)
-                if (!isEditing) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .padding(bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    // In view mode: show search bar and menu button
+                    if (!isEditing) {
                         OutlinedTextField(
                             value = uiState.searchQuery,
                             onValueChange = { viewModel.setSearchQuery(it) },
                             modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp),
-                            placeholder = { Text(stringResource(R.string.search_regions)) },
+                                .width(150.dp)
+                                .height(40.dp),
+                            placeholder = { Text(stringResource(R.string.search_regions), fontSize = MaterialTheme.typography.labelSmall.fontSize) },
                             leadingIcon = { 
                                 Icon(
                                     Icons.Default.Search, 
-                                    contentDescription = null
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
                                 ) 
-                            },
-                            trailingIcon = {
-                                if (uiState.searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                                        Icon(Icons.Default.Clear, contentDescription = "Clear")
-                                    }
-                                }
                             },
                             singleLine = true
                         )
-                        
-                        Spacer(modifier = Modifier.width(8.dp))
-                        
-                        IconButton(
-                            onClick = { showMenu = true },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(Icons.Default.Menu, contentDescription = "Menu")
+                    }
+                    
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.Menu, contentDescription = "Menu")
+                    }
+                    
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        // Toggle edit/view mode
+                        if (isEditing) {
+                            DropdownMenuItem(
+                                onClick = {
+                                    showMenu = false
+                                    viewModel.toggleEditMode()
+                                },
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(24.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(stringResource(R.string.view_mode))
+                                    }
+                                }
+                            )
+                            // Delete and Clear only in editing mode
+                            DropdownMenuItem(
+                                onClick = {
+                                    showMenu = false
+                                    viewModel.showDeleteConfirm()
+                                },
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(24.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(stringResource(R.string.delete))
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                onClick = {
+                                    showMenu = false
+                                    viewModel.showClearConfirm()
+                                },
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(24.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(stringResource(R.string.clear))
+                                    }
+                                }
+                            )
+                        } else {
+                            DropdownMenuItem(
+                                onClick = {
+                                    showMenu = false
+                                    viewModel.toggleEditMode()
+                                },
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(24.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(stringResource(R.string.edit_mode))
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                onClick = {
+                                    showMenu = false
+                                    // TODO: Export for PC
+                                },
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(24.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(stringResource(R.string.export_project))
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                onClick = {
+                                    showMenu = false
+                                    // TODO: Share via Wi-Fi/Bluetooth
+                                },
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(24.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(stringResource(R.string.share))
+                                    }
+                                }
+                            )
                         }
                     }
                 }
-            }
-            
-            // Dropdown menu (outside Column to properly overlay)
-            DropdownMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false }
-            ) {
-                // In editing mode, show option to exit editing mode
-                if (isEditing) {
-                    DropdownMenuItem(
-                        onClick = {
-                            showMenu = false
-                            viewModel.toggleEditMode()
-                        },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.Visibility,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(stringResource(R.string.view_mode))
-                            }
-                        }
-                    )
-                } else {
-                    DropdownMenuItem(
-                        onClick = {
-                            showMenu = false
-                            viewModel.toggleEditMode()
-                        },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.Edit,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(stringResource(R.string.edit_mode))
-                            }
-                        }
-                    )
-                }
-                DropdownMenuItem(
-                    onClick = {
-                        showMenu = false
-                        // TODO: Export for PC
-                    },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(24.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.export_project))
-                        }
-                    }
-                )
-                DropdownMenuItem(
-                    onClick = {
-                        showMenu = false
-                        // TODO: Share via Wi-Fi/Bluetooth
-                    },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(24.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.share))
-                        }
-                    }
-                )
-                // Delete and Clear only in editing mode
-                if (isEditing) {
-                    DropdownMenuItem(
-                        onClick = {
-                            showMenu = false
-                            viewModel.showDeleteConfirm()
-                        },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(24.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(stringResource(R.string.delete))
-                            }
-                        }
-                    )
-                    DropdownMenuItem(
-                        onClick = {
-                            showMenu = false
-                            viewModel.showClearConfirm()
-                        },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(24.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(stringResource(R.string.clear))
-                            }
-                        }
-                    )
-                }
-            }
+            )
         },
         bottomBar = {
             ProjectBottomBar(
@@ -531,6 +488,12 @@ private fun ZoomablePhotoWithOverlay(
                 }
         ) {
             if (isEditing) {
+                // Draw existing regions first (in editing mode)
+                regions.forEach { region ->
+                    val state = states.find { it.id == region.stateId }
+                    drawRegion(region, state, cellSize, photoWidth, photoHeight, isHighlighted = false, isSelected = false, isInEditMode = true)
+                }
+                
                 // Draw grid
                 drawGrid(cellSize, photoWidth, photoHeight)
                 
@@ -667,7 +630,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRegion(
     width: Int,
     height: Int,
     isHighlighted: Boolean,
-    isSelected: Boolean = false
+    isSelected: Boolean = false,
+    isInEditMode: Boolean = false
 ) {
     if (region.cells.isEmpty()) return
     
@@ -683,6 +647,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRegion(
         val alpha = when {
             isSelected -> 0.7f
             isHighlighted -> 0.6f
+            isInEditMode -> 0.3f // More transparent in edit mode to see grid better
             else -> 0.5f
         }
         
@@ -695,10 +660,14 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRegion(
             size = Size(cellWidth, cellHeight)
         )
         
-        // Draw border for highlighted or selected regions
-        if (isHighlighted || isSelected) {
+        // Draw border for highlighted, selected, or edit mode regions
+        if (isHighlighted || isSelected || isInEditMode) {
             drawRect(
-                color = if (isSelected) Color.White else Color.Yellow,
+                color = when {
+                    isSelected -> Color.White
+                    isHighlighted -> Color.Yellow
+                    else -> Color.Gray.copy(alpha = 0.5f) // Subtle border in edit mode
+                },
                 topLeft = Offset(
                     x = cell.col * cellWidth,
                     y = cell.row * cellHeight
@@ -718,9 +687,6 @@ private fun CellSizeControls(
     hasRegions: Boolean,
     modifier: Modifier = Modifier
 ) {
-    var showWarning by remember { mutableStateOf(false) }
-    var pendingCellSize by remember { mutableStateOf(cellSize) }
-    
     // Available cell sizes are powers of 2: 1, 2, 4, 8, 16, 32
     val cellSizeOptions = listOf(1f, 2f, 4f, 8f, 16f, 32f)
     
@@ -733,15 +699,30 @@ private fun CellSizeControls(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            Text(
-                text = stringResource(R.string.cell_size),
-                style = MaterialTheme.typography.labelMedium
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.cell_size),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // Show lock icon if regions exist
+                if (hasRegions) {
+                    Icon(
+                        Icons.Default.Lock,
+                        contentDescription = "Grid locked",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
             
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Minus button - decreases to previous power of 2
+                // Minus button - disabled if regions exist
                 IconButton(
                     onClick = { 
                         val currentIndex = cellSizeOptions.indexOf(cellSize)
@@ -750,33 +731,38 @@ private fun CellSizeControls(
                             onCellSizeChange(newSize)
                             onCellSizeConfirmed(newSize)
                         }
-                    }
+                    },
+                    enabled = !hasRegions
                 ) {
-                    Icon(Icons.Default.Remove, contentDescription = "Decrease grid")
+                    Icon(
+                        Icons.Default.Remove, 
+                        contentDescription = "Decrease grid",
+                        tint = if (hasRegions) 
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        else 
+                            MaterialTheme.colorScheme.onSurface
+                    )
                 }
                 
                 Slider(
                     value = cellSize,
                     onValueChange = { newValue ->
-                        // Find nearest power of 2
-                        val nearestPowerOf2 = cellSizeOptions.minByOrNull { 
-                            kotlin.math.abs(it - newValue) 
-                        } ?: cellSize
-                        
-                        if (hasRegions && nearestPowerOf2 != cellSize) {
-                            pendingCellSize = nearestPowerOf2
-                            showWarning = true
-                        } else {
+                        // Only allow changes if no regions exist
+                        if (!hasRegions) {
+                            val nearestPowerOf2 = cellSizeOptions.minByOrNull { 
+                                kotlin.math.abs(it - newValue) 
+                            } ?: cellSize
                             onCellSizeChange(nearestPowerOf2)
                             onCellSizeConfirmed(nearestPowerOf2)
                         }
                     },
                     valueRange = 1f..32f,
                     steps = 4, // 5 steps between 6 values
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    enabled = !hasRegions
                 )
                 
-                // Plus button - increases to next power of 2
+                // Plus button - disabled if regions exist
                 IconButton(
                     onClick = { 
                         val currentIndex = cellSizeOptions.indexOf(cellSize)
@@ -785,9 +771,17 @@ private fun CellSizeControls(
                             onCellSizeChange(newSize)
                             onCellSizeConfirmed(newSize)
                         }
-                    }
+                    },
+                    enabled = !hasRegions
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Increase grid")
+                    Icon(
+                        Icons.Default.Add, 
+                        contentDescription = "Increase grid",
+                        tint = if (hasRegions) 
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        else 
+                            MaterialTheme.colorScheme.onSurface
+                    )
                 }
             }
             
@@ -798,29 +792,19 @@ private fun CellSizeControls(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
-        }
-    }
-    
-    if (showWarning) {
-        AlertDialog(
-            onDismissRequest = { showWarning = false },
-            title = { Text(stringResource(R.string.warning)) },
-            text = { Text(stringResource(R.string.cell_size_change_warning)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showWarning = false
-                    onCellSizeChange(pendingCellSize)
-                    onCellSizeConfirmed(pendingCellSize)
-                }) {
-                    Text(stringResource(R.string.confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showWarning = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
+            
+            // Show info message if locked
+            if (hasRegions) {
+                Text(
+                    text = stringResource(R.string.grid_locked_info),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(top = 4.dp)
+                )
             }
-        )
+        }
     }
 }
 

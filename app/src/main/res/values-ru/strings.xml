@@ -48,6 +48,7 @@
     
     <!-- Grid -->
     <string name="cell_size">Размер ячейки</string>
+    <string name="grid_locked_info">Размер сетки заблокирован при наличии областей</string>
     <string name="warning">Предупреждение</string>
     <string name="cell_size_change_warning">Изменение размера ячейки удалит все существующие области. Продолжить?</string>
     
