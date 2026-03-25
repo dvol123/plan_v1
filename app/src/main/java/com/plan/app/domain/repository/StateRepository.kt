@@ -11,6 +11,7 @@ interface StateRepository {
     suspend fun getAllStatesOnce(): List<State>
     suspend fun getStateById(stateId: Long): State?
     suspend fun getStateByNameAndColor(name: String, color: Int): State?
+    suspend fun getOrCreate(name: String, color: Int): State
     suspend fun insertState(state: State): Long
     suspend fun insertStates(states: List<State>)
     suspend fun updateState(state: State)

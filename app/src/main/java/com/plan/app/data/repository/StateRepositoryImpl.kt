@@ -35,6 +35,14 @@ class StateRepositoryImpl @Inject constructor(
         return stateDao.getStateByNameAndColor(name, color)?.toDomain()
     }
     
+    override suspend fun getOrCreate(name: String, color: Int): State {
+        val existing = stateDao.getStateByNameAndColor(name, color)
+        if (existing != null) return existing.toDomain()
+        
+        val id = stateDao.insertState(StateEntity(name = name, color = color))
+        return State(id = id, name = name, color = color)
+    }
+    
     override suspend fun insertState(state: State): Long {
         return stateDao.insertState(state.toEntity())
     }

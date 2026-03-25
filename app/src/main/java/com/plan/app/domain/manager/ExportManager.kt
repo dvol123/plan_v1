@@ -8,7 +8,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.net.Uri
-import android.provider.MediaStore
 import com.plan.app.domain.model.Cell
 import com.plan.app.domain.model.Content
 import com.plan.app.domain.model.ContentType
@@ -20,11 +19,11 @@ import com.plan.app.domain.repository.ProjectRepository
 import com.plan.app.domain.repository.RegionRepository
 import com.plan.app.domain.repository.StateRepository
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.*
+import java.io.ByteArrayOutputStream
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -34,9 +33,6 @@ import java.util.zip.ZipOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Data class for export/import project data.
- */
 data class ProjectExportData(
     val name: String,
     val type1: String?,
@@ -65,7 +61,7 @@ data class CellExportData(
 
 data class ContentExportData(
     val type: String,
-    val data: String, // For media, this will be relative path
+    val data: String,
     val sortOrder: Int
 )
 
@@ -81,9 +77,6 @@ data class ImportResult(
     val error: String? = null
 )
 
-/**
- * Manager for export/import operations.
- */
 @Singleton
 class ExportManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -93,22 +86,14 @@ class ExportManager @Inject constructor(
     private val stateRepository: StateRepository,
     private val gson: Gson
 ) {
-    /**
-     * Export project to ZIP format for transfer to another device.
-     * Structure:
-     * - project.json
-     * - photo.jpg (original photo)
-     * - regions/*.json (region data with content info)
-     * - media/* (all attached photos and videos)
-     */
+    
     suspend fun exportToZip(project: Project, outputFile: File): ZipExportResult {
         return withContext(Dispatchers.IO) {
             try {
                 val regions = regionRepository.getRegionsByProjectOnce(project.id)
                 val states = stateRepository.getAllStatesOnce()
                 
-                ZipOutputStream(BufferedOutputStream(FileOutputStream(outputFile))).use { zip ->
-                    // Add project.json
+                ZipOutputStream(java.io.BufferedOutputStream(java.io.FileOutputStream(outputFile))).use { zip ->
                     val projectData = ProjectExportData(
                         name = project.name,
                         type1 = project.type1,
@@ -119,22 +104,18 @@ class ExportManager @Inject constructor(
                     )
                     addEntryToZip(zip, "project.json", gson.toJson(projectData))
                     
-                    // Add photo
                     val photoFile = getFileFromUri(project.photoUri)
                     if (photoFile != null && photoFile.exists()) {
                         addFileToZip(zip, "photo.jpg", photoFile)
                     }
                     
-                    // Collect all media files for the media folder
                     val mediaFiles = mutableMapOf<String, File>()
                     
-                    // Add regions folder with content
                     for (region in regions) {
                         val state = region.stateId?.let { stateId ->
                             states.find { it.id == stateId }
                         }
                         
-                        // Get contents for this region
                         val contents = contentRepository.getContentsByRegionOnce(region.id)
                         val contentExportList = mutableListOf<ContentExportData>()
                         
@@ -142,7 +123,7 @@ class ExportManager @Inject constructor(
                             val relativePath = when (content.type) {
                                 ContentType.PHOTO -> "media/photo_${region.id}_$index.jpg"
                                 ContentType.VIDEO -> "media/video_${region.id}_$index.mp4"
-                                ContentType.TEXT -> content.data // Text data is stored directly
+                                ContentType.TEXT -> content.data
                             }
                             
                             contentExportList.add(
@@ -153,7 +134,6 @@ class ExportManager @Inject constructor(
                                 )
                             )
                             
-                            // Add media file to zip
                             if (content.type != ContentType.TEXT) {
                                 val mediaFile = getFileFromUri(content.data)
                                 if (mediaFile != null && mediaFile.exists()) {
@@ -174,12 +154,10 @@ class ExportManager @Inject constructor(
                             contents = contentExportList
                         )
                         
-                        // Sanitize region name for filename
                         val safeName = region.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
                         addEntryToZip(zip, "regions/${safeName}_${region.id}.json", gson.toJson(regionData))
                     }
                     
-                    // Add all media files
                     for ((path, file) in mediaFiles) {
                         addFileToZip(zip, path, file)
                     }
@@ -193,140 +171,6 @@ class ExportManager @Inject constructor(
         }
     }
     
-    /**
-     * Import project from ZIP archive.
-     */
-    suspend fun importFromZip(zipFile: File, targetDir: File): ImportResult {
-        return withContext(Dispatchers.IO) {
-            try {
-                var projectData: ProjectExportData? = null
-                var photoFile: File? = null
-                val regionDataList = mutableListOf<Pair<RegionExportData, Long>>()
-                val mediaFiles = mutableMapOf<String, File>()
-                
-                // Extract ZIP contents
-                ZipInputStream(BufferedInputStream(FileInputStream(zipFile))).use { zis ->
-                    var entry: ZipEntry? = zis.readEntry()
-                    
-                    while (entry != null) {
-                        when {
-                            entry.name == "project.json" -> {
-                                val content = zis.readBytes().toString(Charsets.UTF_8)
-                                projectData = gson.fromJson(content, ProjectExportData::class.java)
-                            }
-                            entry.name == "photo.jpg" -> {
-                                photoFile = File(targetDir, "photo_${System.currentTimeMillis()}.jpg")
-                                FileOutputStream(photoFile).use { fos ->
-                                    zis.copyTo(fos)
-                                }
-                            }
-                            entry.name.startsWith("regions/") && entry.name.endsWith(".json") -> {
-                                val content = zis.readBytes().toString(Charsets.UTF_8)
-                                val regionData = gson.fromJson(content, RegionExportData::class.java)
-                                // Extract region ID from filename
-                                val idStr = entry.name.substringAfterLast("_").substringBefore(".")
-                                val regionId = idStr.toLongOrNull() ?: System.currentTimeMillis()
-                                regionDataList.add(regionData to regionId)
-                            }
-                            entry.name.startsWith("media/") -> {
-                                val mediaFile = File(targetDir, entry.name.substringAfterLast("/"))
-                                FileOutputStream(mediaFile).use { fos ->
-                                    zis.copyTo(fos)
-                                }
-                                mediaFiles[entry.name] = mediaFile
-                            }
-                        }
-                        entry = zis.readEntry()
-                    }
-                }
-                
-                if (projectData == null) {
-                    return@withContext ImportResult(success = false, error = "Invalid ZIP file: missing project.json")
-                }
-                
-                // Copy photo to app's internal storage
-                val internalPhotoFile = if (photoFile != null && photoFile.exists()) {
-                    val destFile = File(context.filesDir, "project_${System.currentTimeMillis()}.jpg")
-                    photoFile.copyTo(destFile, overwrite = true)
-                    destFile
-                } else null
-                
-                // Create project
-                val project = Project(
-                    name = projectData!!.name,
-                    photoUri = internalPhotoFile?.absolutePath ?: "",
-                    type1 = projectData!!.type1,
-                    type2 = projectData!!.type2,
-                    description = projectData!!.description,
-                    note = projectData!!.note,
-                    cellSize = projectData!!.cellSize
-                )
-                
-                val projectId = projectRepository.insertProject(project)
-                
-                // Create regions with contents
-                for ((regionData, _) in regionDataList) {
-                    // Get or create state
-                    val stateId = if (regionData.stateName != null && regionData.stateColor != null) {
-                        stateRepository.getOrCreate(regionData.stateName, regionData.stateColor).id
-                    } else null
-                    
-                    val region = Region(
-                        projectId = projectId,
-                        name = regionData.name,
-                        stateId = stateId,
-                        type1 = regionData.type1,
-                        type2 = regionData.type2,
-                        description = regionData.description,
-                        note = regionData.note,
-                        cells = regionData.cells.map { Cell(it.row, it.col) }
-                    )
-                    
-                    val regionId = regionRepository.insertRegion(region)
-                    
-                    // Create contents
-                    val contents = regionData.contents.mapIndexed { index, contentData ->
-                        val data = if (contentData.type == "PHOTO" || contentData.type == "VIDEO") {
-                            // Find the media file and copy to internal storage
-                            val sourceFile = mediaFiles[contentData.data]
-                            if (sourceFile != null && sourceFile.exists()) {
-                                val destFile = File(context.filesDir, 
-                                    if (contentData.type == "PHOTO") "photo_${regionId}_$index.jpg" 
-                                    else "video_${regionId}_$index.mp4"
-                                )
-                                sourceFile.copyTo(destFile, overwrite = true)
-                                destFile.absolutePath
-                            } else contentData.data
-                        } else contentData.data
-                        
-                        Content(
-                            regionId = regionId,
-                            type = ContentType.valueOf(contentData.type),
-                            data = data,
-                            sortOrder = contentData.sortOrder
-                        )
-                    }
-                    
-                    if (contents.isNotEmpty()) {
-                        contentRepository.insertContents(contents)
-                    }
-                }
-                
-                ImportResult(success = true, projectId = projectId)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                ImportResult(success = false, error = e.message)
-            }
-        }
-    }
-    
-    /**
-     * Export project for PC (HTML + folders).
-     * Creates a folder with:
-     * - photo_with_areas.jpg (photo with overlay)
-     * - report.html (table with all regions)
-     * - [region_name]/ folders with media and comments
-     */
     suspend fun exportForPC(project: Project, outputDir: File): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -334,7 +178,6 @@ class ExportManager @Inject constructor(
                 val regions = regionRepository.getRegionsByProjectOnce(project.id)
                 val states = stateRepository.getAllStatesOnce()
                 
-                // Create photo with areas overlay
                 val photoFile = getFileFromUri(project.photoUri)
                 if (photoFile != null && photoFile.exists()) {
                     val bitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
@@ -348,17 +191,14 @@ class ExportManager @Inject constructor(
                     }
                 }
                 
-                // Create HTML report
                 val htmlContent = generateHtmlReport(project, regions, states)
                 File(outputDir, "report.html").writeText(htmlContent)
                 
-                // Create subfolders for each region
                 for (region in regions) {
                     val safeName = region.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
                     val regionDir = File(outputDir, safeName)
                     regionDir.mkdirs()
                     
-                    // Copy media files and create comment.txt
                     val contents = contentRepository.getContentsByRegionOnce(region.id)
                     for ((index, content) in contents.withIndex()) {
                         when (content.type) {
@@ -404,7 +244,7 @@ class ExportManager @Inject constructor(
         
         val fillPaint = Paint().apply {
             style = Paint.Style.FILL
-            alpha = 128 // 50% opacity
+            alpha = 128
         }
         
         val strokePaint = Paint().apply {
@@ -457,10 +297,8 @@ class ExportManager @Inject constructor(
         builder.append("</style>")
         builder.append("</head><body>")
         
-        // Project header
         builder.append("<h1>${escapeHtml(project.name)}</h1>")
         
-        // Project info
         builder.append("<div class='project-info'>")
         if (!project.description.isNullOrBlank()) {
             builder.append("<p><strong>Description:</strong> ${escapeHtml(project.description)}</p>")
@@ -477,7 +315,6 @@ class ExportManager @Inject constructor(
         builder.append("<p><strong>Photo:</strong> <a href='photo_with_areas.jpg'>View photo with areas</a></p>")
         builder.append("</div>")
         
-        // Regions table
         builder.append("<h2>Regions (${regions.size})</h2>")
         builder.append("<table>")
         builder.append("<tr><th>#</th><th>Name</th><th>State</th><th>Type 1</th><th>Type 2</th><th>Description</th><th>Media</th></tr>")
@@ -510,7 +347,6 @@ class ExportManager @Inject constructor(
         
         builder.append("</table>")
         
-        // Footer
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         builder.append("<p style='color:#888;margin-top:30px;'>Generated on ${dateFormat.format(Date())}</p>")
         builder.append("</body></html>")
@@ -542,7 +378,6 @@ class ExportManager @Inject constructor(
     private fun getFileFromUri(uriString: String): File? {
         return try {
             if (uriString.startsWith("content://") || uriString.startsWith("file://")) {
-                // For content URIs, copy to temp file
                 val uri = Uri.parse(uriString)
                 val inputStream = context.contentResolver.openInputStream(uri) ?: return null
                 val tempFile = File.createTempFile("export_", ".tmp", context.cacheDir)
@@ -552,21 +387,11 @@ class ExportManager @Inject constructor(
                 inputStream.close()
                 tempFile
             } else {
-                // Direct file path
                 val file = File(uriString)
                 if (file.exists()) file else null
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            null
-        }
-    }
-    
-    // Extension function for ZipInputStream
-    private fun ZipInputStream.readEntry(): ZipEntry? {
-        return try {
-            nextEntry
-        } catch (e: Exception) {
             null
         }
     }
