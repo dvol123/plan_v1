@@ -395,4 +395,176 @@ class ExportManager @Inject constructor(
             null
         }
     }
+    
+    /**
+     * Import a project from a ZIP file.
+     */
+    suspend fun importFromZip(zipUri: Uri): ImportResult {
+        return withContext(Dispatchers.IO) {
+            try {
+                val tempZipFile = File.createTempFile("import_", ".zip", context.cacheDir)
+                context.contentResolver.openInputStream(zipUri)?.use { input ->
+                    tempZipFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                
+                val mediaDir = File(context.filesDir, "media")
+                if (!mediaDir.exists()) mediaDir.mkdirs()
+                
+                var projectData: ProjectExportData? = null
+                val regionsData = mutableListOf<Pair<RegionExportData, Long>>()
+                val mediaFiles = mutableMapOf<String, File>()
+                var photoFile: File? = null
+                
+                ZipInputStream(tempZipFile.inputStream()).use { zipIn ->
+                    var entry = zipIn.nextEntry
+                    while (entry != null) {
+                        when {
+                            entry.name == "project.json" -> {
+                                val content = zipIn.readBytes().toString(Charsets.UTF_8)
+                                projectData = gson.fromJson(content, ProjectExportData::class.java)
+                            }
+                            entry.name == "photo.jpg" -> {
+                                photoFile = File.createTempFile("imported_photo_", ".jpg", context.cacheDir)
+                                photoFile?.outputStream()?.use { output ->
+                                    zipIn.copyTo(output)
+                                }
+                            }
+                            entry.name.startsWith("media/") -> {
+                                val mediaFile = File(context.cacheDir, entry.name.replace("/", "_"))
+                                mediaFile.outputStream().use { output ->
+                                    zipIn.copyTo(output)
+                                }
+                                mediaFiles[entry.name] = mediaFile
+                            }
+                            entry.name.startsWith("regions/") && entry.name.endsWith(".json") -> {
+                                val content = zipIn.readBytes().toString(Charsets.UTF_8)
+                                val regionData = gson.fromJson(content, RegionExportData::class.java)
+                                regionsData.add(Pair(regionData, System.currentTimeMillis()))
+                            }
+                        }
+                        zipIn.closeEntry()
+                        entry = zipIn.nextEntry
+                    }
+                }
+                
+                tempZipFile.delete()
+                
+                if (projectData == null) {
+                    return@withContext ImportResult(success = false, error = "Invalid project file: missing project.json")
+                }
+                
+                // Copy photo to permanent storage
+                val photoPath = if (photoFile != null && photoFile!!.exists()) {
+                    val permanentPhoto = File(mediaDir, "project_photo_${System.currentTimeMillis()}.jpg")
+                    photoFile!!.copyTo(permanentPhoto, overwrite = true)
+                    photoFile!!.delete()
+                    permanentPhoto.absolutePath
+                } else null
+                
+                // Create project
+                val project = Project(
+                    name = projectData!!.name,
+                    photoUri = photoPath ?: "",
+                    type1 = projectData!!.type1,
+                    type2 = projectData!!.type2,
+                    description = projectData!!.description,
+                    note = projectData!!.note,
+                    cellSize = projectData!!.cellSize
+                )
+                val projectId = projectRepository.insert(project)
+                
+                // Create regions and contents
+                for ((regionData, _) in regionsData) {
+                    // Get or create state
+                    var stateId: Long? = null
+                    if (regionData.stateName != null && regionData.stateColor != null) {
+                        val existingState = stateRepository.getStateByNameAndColor(regionData.stateName, regionData.stateColor)
+                        stateId = existingState?.id ?: stateRepository.insertState(
+                            com.plan.app.domain.model.State(
+                                name = regionData.stateName,
+                                color = regionData.stateColor
+                            )
+                        )
+                    }
+                    
+                    val region = com.plan.app.domain.model.Region(
+                        projectId = projectId,
+                        name = regionData.name,
+                        stateId = stateId,
+                        type1 = regionData.type1,
+                        type2 = regionData.type2,
+                        description = regionData.description,
+                        note = regionData.note,
+                        cells = regionData.cells.map { com.plan.app.domain.model.Cell(it.row, it.col) }
+                    )
+                    val regionId = regionRepository.insertRegion(region)
+                    
+                    // Create contents
+                    for (contentData in regionData.contents) {
+                        val contentType = when (contentData.type) {
+                            "PHOTO" -> ContentType.PHOTO
+                            "VIDEO" -> ContentType.VIDEO
+                            else -> ContentType.TEXT
+                        }
+                        
+                        val contentPath = if (contentType != ContentType.TEXT) {
+                            val mediaFile = mediaFiles[contentData.data]
+                            if (mediaFile != null && mediaFile.exists()) {
+                                val extension = if (contentType == ContentType.PHOTO) ".jpg" else ".mp4"
+                                val permanentMedia = File(mediaDir, "${contentType.name.lowercase()}_${regionId}_${System.currentTimeMillis()}$extension")
+                                mediaFile.copyTo(permanentMedia, overwrite = true)
+                                mediaFile.delete()
+                                permanentMedia.absolutePath
+                            } else contentData.data
+                        } else contentData.data
+                        
+                        contentRepository.insert(
+                            Content(
+                                regionId = regionId,
+                                type = contentType,
+                                data = contentPath,
+                                sortOrder = contentData.sortOrder
+                            )
+                        )
+                    }
+                }
+                
+                ImportResult(success = true, projectId = projectId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                ImportResult(success = false, error = e.message)
+            }
+        }
+    }
+    
+    /**
+     * Export all projects to a single ZIP file.
+     */
+    suspend fun exportAllProjects(outputFile: File): ZipExportResult {
+        return withContext(Dispatchers.IO) {
+            try {
+                val projects = projectRepository.getAllProjectsOnce()
+                
+                ZipOutputStream(java.io.BufferedOutputStream(java.io.FileOutputStream(outputFile))).use { zip ->
+                    for (project in projects) {
+                        val projectZipFile = File.createTempFile("project_", ".zip", context.cacheDir)
+                        val result = exportToZip(project, projectZipFile)
+                        
+                        if (result.success) {
+                            val safeName = project.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
+                            addFileToZip(zip, "projects/${safeName}_${project.id}.zip", projectZipFile)
+                            projectZipFile.delete()
+                        }
+                    }
+                }
+                
+                ZipExportResult(success = true, file = outputFile)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                ZipExportResult(success = false, error = e.message)
+            }
+        }
+    }
 }

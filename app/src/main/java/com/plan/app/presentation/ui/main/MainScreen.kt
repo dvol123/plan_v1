@@ -1,6 +1,8 @@
 package com.plan.app.presentation.ui.main
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.widget.Toast
@@ -61,6 +63,7 @@ fun MainScreen(
     var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
     var showCameraPermissionDenied by remember { mutableStateOf(false) }
     var showViewDialog by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
     
     // Camera launcher - must be declared before cameraPermissionLauncher
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -101,6 +104,96 @@ fun MainScreen(
         }
     }
     
+    // Import launcher
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.importProjectFromZip(it) { success, error ->
+                val message = if (success) context.getString(R.string.import_success) else error
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    
+    // Export launcher - for single project
+    val exportProjectLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri: Uri? ->
+        uri?.let {
+            val tempFile = File(context.cacheDir, "export_temp.zip")
+            viewModel.exportProjectToZip(context, tempFile) { success, error ->
+                if (success) {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        tempFile.inputStream().use { input ->
+                            input.copyTo(output)
+                        }
+                    }
+                    Toast.makeText(context, context.getString(R.string.export_success), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, error ?: context.getString(R.string.export_error), Toast.LENGTH_SHORT).show()
+                }
+                tempFile.delete()
+            }
+        }
+    }
+    
+    // Export all launcher
+    val exportAllLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri: Uri? ->
+        uri?.let {
+            val tempFile = File(context.cacheDir, "export_all_temp.zip")
+            viewModel.exportAllProjects(tempFile) { success, error ->
+                if (success) {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        tempFile.inputStream().use { input ->
+                            input.copyTo(output)
+                        }
+                    }
+                    Toast.makeText(context, context.getString(R.string.export_success), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, error ?: context.getString(R.string.export_error), Toast.LENGTH_SHORT).show()
+                }
+                tempFile.delete()
+            }
+        }
+    }
+    
+    // Share launcher
+    val shareLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri: Uri? ->
+        uri?.let {
+            val tempFile = File(context.cacheDir, "share_temp.zip")
+            uiState.selectedProject?.let { project ->
+                viewModel.exportProjectToZip(context, tempFile) { success, error ->
+                    if (success) {
+                        context.contentResolver.openOutputStream(uri)?.use { output ->
+                            tempFile.inputStream().use { input ->
+                                input.copyTo(output)
+                            }
+                        }
+                        // Create share intent
+                        val shareUri = FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            tempFile
+                        )
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "application/zip"
+                            putExtra(Intent.EXTRA_STREAM, shareUri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share)))
+                    } else {
+                        Toast.makeText(context, error ?: context.getString(R.string.export_error), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+    
     // Filter projects based on search query
     val filteredProjects = remember(projects, uiState.searchQuery) {
         if (uiState.searchQuery.isBlank()) {
@@ -129,6 +222,32 @@ fun MainScreen(
         ViewProjectDialog(
             project = uiState.selectedProject!!,
             onDismiss = { showViewDialog = false }
+        )
+    }
+    
+    // Export dialog
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = { Text(stringResource(R.string.export_project)) },
+            text = { Text("Choose what to export") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExportDialog = false
+                    if (uiState.selectedProject != null) {
+                        exportProjectLauncher.launch("${uiState.selectedProject!!.name}.zip")
+                    } else {
+                        exportAllLauncher.launch("all_projects.zip")
+                    }
+                }) {
+                    Text(if (uiState.selectedProject != null) "Export selected" else "Export all")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExportDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
         )
     }
     
@@ -172,7 +291,8 @@ fun MainScreen(
                         DropdownMenuItem(
                             onClick = {
                                 showMenu = false
-                                // TODO: Implement import
+                                // Import
+                                importLauncher.launch("application/zip")
                             },
                             text = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -185,26 +305,32 @@ fun MainScreen(
                         DropdownMenuItem(
                             onClick = {
                                 showMenu = false
-                                // TODO: Implement share
-                            },
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(24.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(stringResource(R.string.share))
-                                }
-                            }
-                        )
-                        DropdownMenuItem(
-                            onClick = {
-                                showMenu = false
-                                viewModel.showExportDialog()
+                                // Export - show dialog to choose
+                                showExportDialog = true
                             },
                             text = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(24.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(stringResource(R.string.export_project))
+                                }
+                            }
+                        )
+                        DropdownMenuItem(
+                            onClick = {
+                                showMenu = false
+                                // Share - export and share
+                                if (uiState.selectedProject != null) {
+                                    shareLauncher.launch("${uiState.selectedProject!!.name}_share.zip")
+                                } else {
+                                    Toast.makeText(context, "Select a project to share", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.share))
                                 }
                             }
                         )
@@ -218,19 +344,6 @@ fun MainScreen(
                                     Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(24.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(stringResource(R.string.settings))
-                                }
-                            }
-                        )
-                        DropdownMenuItem(
-                            onClick = {
-                                showMenu = false
-                                // TODO: Implement exit with confirmation
-                            },
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(24.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(stringResource(R.string.exit))
                                 }
                             }
                         )
@@ -409,7 +522,6 @@ fun MainScreen(
                         )
                     )
                     selectedPhotoUri = null
-                    // Stay on first screen after creating project (as per user requirement)
                 }
             }
         )
@@ -467,6 +579,18 @@ fun MainScreen(
             viewModel.clearError()
         }
     }
+    
+    // Loading indicator
+    if (uiState.isLoading) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.3f)),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -484,7 +608,7 @@ private fun ProjectListItem(
             .clip(RoundedCornerShape(12.dp))
             .combinedClickable(
                 onClick = { }, // Single tap does nothing for selection
-                onDoubleClick = onSelect // Double-tap selects the project (as per spec)
+                onDoubleClick = onSelect // Double-tap selects the project
             ),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) {
@@ -521,7 +645,7 @@ private fun ProjectListItem(
                 }
             }
             
-            // Thumbnail - clickable for fullscreen view (single tap as per spec)
+            // Thumbnail - clickable for fullscreen view
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(project.photoUri)

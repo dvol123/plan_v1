@@ -49,6 +49,14 @@ class ProjectRepositoryImpl @Inject constructor(
         projectDao.deleteProjectById(projectId)
     }
     
+    override suspend fun getAllProjectsOnce(): List<Project> {
+        return projectDao.getAllProjectsOnce().map { it.toDomain() }
+    }
+    
+    override suspend fun insert(project: Project): Long {
+        return projectDao.insertProject(project.toEntity())
+    }
+    
     private fun ProjectEntity.toDomain(): Project {
         return Project(
             id = id,

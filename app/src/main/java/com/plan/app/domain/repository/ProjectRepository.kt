@@ -8,8 +8,10 @@ import kotlinx.coroutines.flow.Flow
  */
 interface ProjectRepository {
     fun getAllProjects(): Flow<List<Project>>
+    suspend fun getAllProjectsOnce(): List<Project>
     suspend fun getProjectById(projectId: Long): Project?
     fun searchProjects(query: String): Flow<List<Project>>
+    suspend fun insert(project: Project): Long
     suspend fun insertProject(project: Project): Long
     suspend fun updateProject(project: Project)
     suspend fun deleteProject(project: Project)

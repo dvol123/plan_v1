@@ -1,7 +1,10 @@
 package com.plan.app.presentation.viewmodel
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.plan.app.domain.manager.ExportManager
 import com.plan.app.domain.manager.ProjectManager
 import com.plan.app.domain.model.Project
 import com.plan.app.domain.usecase.GetProjectsUseCase
@@ -14,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 /**
@@ -28,7 +32,11 @@ data class MainUiState(
     val showDeleteConfirm: Boolean = false,
     val showExportDialog: Boolean = false,
     val showSettingsDialog: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val exportSuccess: Boolean = false,
+    val exportMessage: String? = null,
+    val importSuccess: Boolean = false,
+    val importMessage: String? = null
 )
 
 /**
@@ -39,7 +47,8 @@ class MainViewModel @Inject constructor(
     private val getProjectsUseCase: GetProjectsUseCase,
     private val manageProjectUseCase: ManageProjectUseCase,
     private val manageRegionUseCase: ManageRegionUseCase,
-    private val projectManager: ProjectManager
+    private val projectManager: ProjectManager,
+    private val exportManager: ExportManager
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(MainUiState())
@@ -152,7 +161,101 @@ class MainViewModel @Inject constructor(
         }
     }
     
+    // Export selected project to ZIP
+    fun exportProjectToZip(context: Context, outputFile: File, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val project = _uiState.value.selectedProject
+                if (project == null) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        exportSuccess = false,
+                        exportMessage = "No project selected"
+                    )
+                    onComplete(false, "No project selected")
+                    return@launch
+                }
+                
+                val result = exportManager.exportToZip(project, outputFile)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = result.success,
+                    exportMessage = if (result.success) "Export successful" else result.error
+                )
+                onComplete(result.success, result.error)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = false,
+                    exportMessage = e.message
+                )
+                onComplete(false, e.message)
+            }
+        }
+    }
+    
+    // Export all projects to ZIP
+    fun exportAllProjects(outputFile: File, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val result = exportManager.exportAllProjects(outputFile)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = result.success,
+                    exportMessage = if (result.success) "Export successful" else result.error
+                )
+                onComplete(result.success, result.error)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = false,
+                    exportMessage = e.message
+                )
+                onComplete(false, e.message)
+            }
+        }
+    }
+    
+    // Import project from ZIP
+    fun importProjectFromZip(zipUri: Uri, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val result = exportManager.importFromZip(zipUri)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    importSuccess = result.success,
+                    importMessage = if (result.success) "Import successful" else result.error
+                )
+                onComplete(result.success, result.error)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    importSuccess = false,
+                    importMessage = e.message
+                )
+                onComplete(false, e.message)
+            }
+        }
+    }
+    
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+    
+    fun clearExportMessage() {
+        _uiState.value = _uiState.value.copy(
+            exportSuccess = false,
+            exportMessage = null
+        )
+    }
+    
+    fun clearImportMessage() {
+        _uiState.value = _uiState.value.copy(
+            importSuccess = false,
+            importMessage = null
+        )
     }
 }

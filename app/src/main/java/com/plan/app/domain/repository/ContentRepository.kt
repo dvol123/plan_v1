@@ -11,6 +11,7 @@ interface ContentRepository {
     suspend fun getContentsByRegionOnce(regionId: Long): List<Content>
     suspend fun insertContent(content: Content): Long
     suspend fun insertContents(contents: List<Content>)
+    suspend fun insert(content: Content): Long
     suspend fun deleteContent(content: Content)
     suspend fun deleteContentsByRegion(regionId: Long)
 }
