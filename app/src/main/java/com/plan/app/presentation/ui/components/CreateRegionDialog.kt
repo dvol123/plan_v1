@@ -2,7 +2,6 @@ package com.plan.app.presentation.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
@@ -40,7 +39,31 @@ fun CreateRegionDialog(
     var description by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var nameError by remember { mutableStateOf(false) }
-    var showCreateStateDialog by remember { mutableStateOf(false) }
+    
+    // State field
+    var stateText by remember { mutableStateOf("") }
+    var selectedColorIndex by remember { mutableStateOf(0) }
+    var showStateDropdown by remember { mutableStateOf(false) }
+    
+    // Filter states by input
+    val filteredStates = remember(states, stateText) {
+        if (stateText.isBlank()) {
+            states
+        } else {
+            states.filter { it.name.contains(stateText, ignoreCase = true) }
+        }
+    }
+    
+    // Check if current text matches an existing state
+    val matchedState = states.find { it.name.equals(stateText, ignoreCase = true) }
+    
+    // Determine if we're creating a new state (text entered but no match)
+    val isCreatingNewState = stateText.isNotBlank() && matchedState == null
+    
+    // Update selectedStateId when matched state changes
+    LaunchedEffect(matchedState) {
+        selectedStateId = matchedState?.id
+    }
     
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -78,7 +101,7 @@ fun CreateRegionDialog(
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                // State selector - separate field above types
+                // === STATE FIELD (отдельное поле выше цвета) ===
                 Text(
                     text = stringResource(R.string.state),
                     style = MaterialTheme.typography.labelMedium
@@ -86,63 +109,133 @@ fun CreateRegionDialog(
                 
                 Spacer(modifier = Modifier.height(4.dp))
                 
-                // State chips with create button
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    states.forEach { state ->
-                        FilterChip(
-                            selected = selectedStateId == state.id,
-                            onClick = { 
-                                selectedStateId = if (selectedStateId == state.id) null else state.id
-                            },
-                            label = { Text(state.name) },
-                            leadingIcon = {
+                // State input with dropdown
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = stateText,
+                        onValueChange = { 
+                            stateText = it
+                            showStateDropdown = it.isNotBlank()
+                        },
+                        label = { Text(stringResource(R.string.state_name)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        trailingIcon = {
+                            // Show color indicator if state selected
+                            matchedState?.let { state ->
                                 Box(
                                     modifier = Modifier
-                                        .size(16.dp)
+                                        .size(24.dp)
+                                        .padding(end = 8.dp)
                                         .clip(RoundedCornerShape(4.dp))
                                         .background(Color(state.color))
                                 )
                             }
-                        )
-                    }
-                    
-                    // Create new state button
-                    FilterChip(
-                        selected = false,
-                        onClick = { showCreateStateDialog = true },
-                        label = { Text(stringResource(R.string.new_state)) },
-                        leadingIcon = {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                         }
                     )
+                    
+                    // Dropdown with existing states
+                    if (showStateDropdown && filteredStates.isNotEmpty()) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            shadowElevation = 4.dp,
+                            tonalElevation = 2.dp
+                        ) {
+                            LazyColumn(
+                                modifier = Modifier.heightIn(max = 150.dp)
+                            ) {
+                                items(count = filteredStates.size) { index ->
+                                    val state = filteredStates[index]
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                stateText = state.name
+                                                selectedStateId = state.id
+                                                showStateDropdown = false
+                                            }
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(Color(state.color))
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = state.name,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 
-                // Show selected state info with color preview
-                val selectedState = states.find { it.id == selectedStateId }
-                if (selectedState != null) {
+                // === COLOR FIELD (отдельное поле, показывается только при создании нового state) ===
+                if (isCreatingNewState) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Text(
+                        text = stringResource(R.string.select_color),
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Color picker row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        State.PREDEFINED_COLORS.forEachIndexed { index, color ->
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(color))
+                                    .clickable { selectedColorIndex = index }
+                            ) {
+                                if (selectedColorIndex == index) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        tint = Color.White,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(8.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Preview of new state
                     Spacer(modifier = Modifier.height(8.dp))
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = Color(selectedState.color).copy(alpha = 0.2f),
-                        modifier = Modifier.fillMaxWidth()
+                        color = Color(State.PREDEFINED_COLORS[selectedColorIndex]).copy(alpha = 0.2f)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(20.dp)
+                                    .size(16.dp)
                                     .clip(RoundedCornerShape(4.dp))
-                                    .background(Color(selectedState.color))
+                                    .background(Color(State.PREDEFINED_COLORS[selectedColorIndex]))
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = stringResource(R.string.selected_state, selectedState.name),
-                                style = MaterialTheme.typography.bodyMedium
+                                text = "New: $stateText",
+                                style = MaterialTheme.typography.bodySmall
                             )
                         }
                     }
@@ -208,14 +301,28 @@ fun CreateRegionDialog(
                     Button(
                         onClick = {
                             if (name.isNotBlank()) {
-                                onCreate(
-                                    name.trim(),
-                                    selectedStateId,
-                                    type1.trim().ifBlank { null },
-                                    type2.trim().ifBlank { null },
-                                    description.trim().ifBlank { null },
-                                    note.trim().ifBlank { null }
-                                )
+                                // If creating new state, create it first
+                                if (isCreatingNewState) {
+                                    onCreateState(stateText, State.PREDEFINED_COLORS[selectedColorIndex]) { newState ->
+                                        onCreate(
+                                            name.trim(),
+                                            newState.id,
+                                            type1.trim().ifBlank { null },
+                                            type2.trim().ifBlank { null },
+                                            description.trim().ifBlank { null },
+                                            note.trim().ifBlank { null }
+                                        )
+                                    }
+                                } else {
+                                    onCreate(
+                                        name.trim(),
+                                        selectedStateId,
+                                        type1.trim().ifBlank { null },
+                                        type2.trim().ifBlank { null },
+                                        description.trim().ifBlank { null },
+                                        note.trim().ifBlank { null }
+                                    )
+                                }
                             } else {
                                 nameError = true
                             }
@@ -226,24 +333,5 @@ fun CreateRegionDialog(
                 }
             }
         }
-    }
-    
-    // Create state dialog
-    if (showCreateStateDialog) {
-        CreateStateDialog(
-            existingStates = states,
-            onDismiss = { showCreateStateDialog = false },
-            onCreate = { stateName, color ->
-                // Create state and auto-select it
-                onCreateState(stateName, color) { newState ->
-                    selectedStateId = newState.id
-                }
-                showCreateStateDialog = false
-            },
-            onSelectExisting = { state ->
-                selectedStateId = state.id
-                showCreateStateDialog = false
-            }
-        )
     }
 }

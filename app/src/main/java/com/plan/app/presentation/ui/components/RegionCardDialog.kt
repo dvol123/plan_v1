@@ -72,6 +72,11 @@ fun RegionCardDialog(
     var description by remember { mutableStateOf(region.description ?: "") }
     var note by remember { mutableStateOf(region.note ?: "") }
     
+    // State field state
+    var stateText by remember { mutableStateOf("") }
+    var selectedColorIndex by remember { mutableStateOf(0) }
+    var pendingNewState by remember { mutableStateOf<Pair<String, Int>?>(null) }
+    
     var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
     var cameraVideoUri by remember { mutableStateOf<Uri?>(null) }
     var showCameraPermissionDenied by remember { mutableStateOf(false) }
@@ -259,8 +264,12 @@ fun RegionCardDialog(
                         states = states,
                         selectedStateId = selectedStateId,
                         isEditing = isEditing,
+                        stateText = stateText,
+                        selectedColorIndex = selectedColorIndex,
+                        onStateTextChanged = { stateText = it },
+                        onColorSelected = { selectedColorIndex = it },
                         onStateSelected = { selectedStateId = it },
-                        onCreateState = onCreateState
+                        onNewStatePrepared = { name, color -> pendingNewState = Pair(name, color) }
                     )
                     
                     Spacer(modifier = Modifier.height(12.dp))
@@ -319,6 +328,14 @@ fun RegionCardDialog(
                     if (isEditing) {
                         Button(
                             onClick = {
+                                // Check if we need to create a new state first
+                                val pending = pendingNewState
+                                if (pending != null) {
+                                    // Create new state, then save region
+                                    onCreateState(pending.first, pending.second)
+                                    // Note: stateId will be set after state is created
+                                    // For now, save without stateId - it will be updated when state is created
+                                }
                                 onSave(region.copy(
                                     name = name,
                                     stateId = selectedStateId,
@@ -532,12 +549,45 @@ private fun StateSelectorSection(
     states: List<State>,
     selectedStateId: Long?,
     isEditing: Boolean,
+    stateText: String,
+    selectedColorIndex: Int,
+    onStateTextChanged: (String) -> Unit,
+    onColorSelected: (Int) -> Unit,
     onStateSelected: (Long?) -> Unit,
-    onCreateState: (String, Int) -> Unit
+    onNewStatePrepared: (String, Int) -> Unit
 ) {
-    var showCreateDialog by remember { mutableStateOf(false) }
+    // Find currently selected state
+    val selectedState = states.find { it.id == selectedStateId }
+    
+    // Initialize stateText from selected state if empty
+    var initializedStateText by remember { mutableStateOf(false) }
+    LaunchedEffect(selectedState) {
+        if (!initializedStateText && selectedState != null && stateText.isEmpty()) {
+            onStateTextChanged(selectedState.name)
+            initializedStateText = true
+        }
+    }
+    
+    // Filter states by input
+    val filteredStates = remember(states, stateText) {
+        if (stateText.isBlank()) {
+            states
+        } else {
+            states.filter { it.name.contains(stateText, ignoreCase = true) }
+        }
+    }
+    
+    // Check if current text matches an existing state
+    val matchedState = states.find { it.name.equals(stateText, ignoreCase = true) }
+    
+    // Determine if we're creating a new state (text entered but no match)
+    val isCreatingNewState = stateText.isNotBlank() && matchedState == null
+    
+    // Track dropdown visibility
+    var showDropdown by remember { mutableStateOf(false) }
     
     Column {
+        // === STATE FIELD (отдельное поле выше) ===
         Text(
             text = stringResource(R.string.state),
             style = MaterialTheme.typography.labelMedium
@@ -546,43 +596,151 @@ private fun StateSelectorSection(
         Spacer(modifier = Modifier.height(4.dp))
         
         if (isEditing) {
-            // Horizontal scrollable state chips
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                states.forEach { state ->
-                    FilterChip(
-                        selected = selectedStateId == state.id,
-                        onClick = { 
-                            onStateSelected(if (selectedStateId == state.id) null else state.id)
-                        },
-                        label = { Text(state.name) },
-                        leadingIcon = {
+            // State input with dropdown
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = stateText,
+                    onValueChange = { 
+                        onStateTextChanged(it)
+                        showDropdown = it.isNotBlank()
+                        // Auto-select if matches existing state
+                        val match = states.find { s -> s.name.equals(it, ignoreCase = true) }
+                        if (match != null) {
+                            onStateSelected(match.id)
+                        } else if (it.isNotBlank()) {
+                            // New state - prepare it with selected color
+                            onNewStatePrepared(it, State.PREDEFINED_COLORS[selectedColorIndex])
+                        }
+                    },
+                    label = { Text(stringResource(R.string.state_name)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    trailingIcon = {
+                        // Show color indicator if state matched
+                        matchedState?.let { state ->
                             Box(
                                 modifier = Modifier
-                                    .size(16.dp)
+                                    .size(24.dp)
+                                    .padding(end = 8.dp)
                                     .clip(RoundedCornerShape(4.dp))
                                     .background(Color(state.color))
                             )
                         }
-                    )
-                }
-                
-                // Create new state button
-                FilterChip(
-                    selected = false,
-                    onClick = { showCreateDialog = true },
-                    label = { Text(stringResource(R.string.new_state)) },
-                    leadingIcon = {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                     }
                 )
+                
+                // Dropdown with existing states
+                if (showDropdown && filteredStates.isNotEmpty()) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        shadowElevation = 4.dp,
+                        tonalElevation = 2.dp
+                    ) {
+                        LazyColumn(
+                            modifier = Modifier.heightIn(max = 150.dp)
+                        ) {
+                            items(filteredStates.size) { index ->
+                                val state = filteredStates[index]
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            onStateTextChanged(state.name)
+                                            onStateSelected(state.id)
+                                            showDropdown = false
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(Color(state.color))
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = state.name,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // === COLOR FIELD (отдельное поле ниже, только при создании нового state) ===
+            if (isCreatingNewState) {
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Text(
+                    text = stringResource(R.string.select_color),
+                    style = MaterialTheme.typography.labelMedium
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Color picker row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    State.PREDEFINED_COLORS.forEachIndexed { index, color ->
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(color))
+                                .clickable { 
+                                    onColorSelected(index)
+                                    onNewStatePrepared(stateText, State.PREDEFINED_COLORS[index])
+                                }
+                        ) {
+                            if (selectedColorIndex == index) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = "Selected",
+                                    tint = Color.White,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(8.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Preview of new state
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(State.PREDEFINED_COLORS[selectedColorIndex]).copy(alpha = 0.2f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(State.PREDEFINED_COLORS[selectedColorIndex]))
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "New: $stateText",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
             }
         } else {
             // View mode - show selected state
-            val currentState = states.find { it.id == selectedStateId }
-            if (currentState != null) {
+            if (selectedState != null) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -590,11 +748,11 @@ private fun StateSelectorSection(
                         modifier = Modifier
                             .size(24.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(Color(currentState.color))
+                            .background(Color(selectedState.color))
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = currentState.name,
+                        text = selectedState.name,
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }
@@ -606,22 +764,6 @@ private fun StateSelectorSection(
                 )
             }
         }
-    }
-    
-    // Create state dialog
-    if (showCreateDialog) {
-        CreateStateDialog(
-            existingStates = states,
-            onDismiss = { showCreateDialog = false },
-            onCreate = { name, color ->
-                onCreateState(name, color)
-                showCreateDialog = false
-            },
-            onSelectExisting = { state ->
-                onStateSelected(state.id)
-                showCreateDialog = false
-            }
-        )
     }
 }
 
