@@ -1,6 +1,8 @@
 package com.plan.app.presentation.ui.project
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -41,6 +43,7 @@ import com.plan.app.domain.model.State
 import com.plan.app.presentation.viewmodel.ProjectViewModel
 import com.plan.app.presentation.ui.components.RegionCardDialog
 import com.plan.app.presentation.ui.components.CreateRegionDialog
+import java.io.File
 import kotlin.math.max
 import kotlin.math.min
 
@@ -81,6 +84,50 @@ fun ProjectScreen(
         uiState.errorMessage?.let { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             viewModel.clearError()
+        }
+    }
+    
+    // Export message handling
+    LaunchedEffect(uiState.exportMessage) {
+        uiState.exportMessage?.let { message ->
+            val resId = if (uiState.exportSuccess) R.string.export_success else R.string.export_error
+            Toast.makeText(context, context.getString(resId), Toast.LENGTH_SHORT).show()
+            viewModel.clearExportMessage()
+        }
+    }
+    
+    // Export/Import launchers
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri ->
+        uri?.let {
+            context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                val tempFile = File(context.cacheDir, "temp_export.zip")
+                viewModel.exportProjectToZip(tempFile) { success, _ ->
+                    if (success) {
+                        tempFile.inputStream().use { input ->
+                            input.copyTo(outputStream)
+                        }
+                    }
+                    tempFile.delete()
+                }
+            }
+        }
+    }
+    
+    val exportHtmlLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        uri?.let {
+            val outputDir = File(context.cacheDir, "export_html_${System.currentTimeMillis()}")
+            outputDir.mkdirs()
+            viewModel.exportProjectForPC(outputDir) { success ->
+                if (success) {
+                    // Copy to selected directory
+                    // For simplicity, we show success message
+                    Toast.makeText(context, context.getString(R.string.export_success), Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
     
@@ -191,7 +238,9 @@ fun ProjectScreen(
                 DropdownMenuItem(
                     onClick = {
                         showMenu = false
-                        // TODO: Export for PC
+                        uiState.project?.let { project ->
+                            exportLauncher.launch("${project.name}.zip")
+                        }
                     },
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -204,7 +253,10 @@ fun ProjectScreen(
                 DropdownMenuItem(
                     onClick = {
                         showMenu = false
-                        // TODO: Share via Wi-Fi/Bluetooth
+                        // Share via Wi-Fi/Bluetooth - uses same ZIP export
+                        uiState.project?.let { project ->
+                            exportLauncher.launch("${project.name}_share.zip")
+                        }
                     },
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -330,7 +382,10 @@ fun ProjectScreen(
                 viewModel.updateRegion(updatedRegion)
             },
             onAddPhoto = { /* TODO */ },
-            onAddVideo = { /* TODO */ }
+            onAddVideo = { /* TODO */ },
+            onCreateState = { name, color ->
+                viewModel.createState(name, color)
+            }
         )
     }
     

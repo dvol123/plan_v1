@@ -2,6 +2,7 @@ package com.plan.app.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.plan.app.domain.manager.ExportManager
 import com.plan.app.domain.manager.GridManager
 import com.plan.app.domain.manager.ProjectManager
 import com.plan.app.domain.model.Cell
@@ -14,6 +15,7 @@ import com.plan.app.domain.repository.StateRepository
 import com.plan.app.domain.usecase.ManageContentUseCase
 import com.plan.app.domain.usecase.ManageProjectUseCase
 import com.plan.app.domain.usecase.ManageRegionUseCase
+import com.plan.app.domain.usecase.ManageStateUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -39,7 +41,9 @@ data class ProjectUiState(
     val showCreateRegionDialog: Boolean = false,
     val showDeleteConfirm: Boolean = false,
     val showClearConfirm: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val exportSuccess: Boolean = false,
+    val exportMessage: String? = null
 )
 
 /**
@@ -52,8 +56,10 @@ class ProjectViewModel @Inject constructor(
     private val manageRegionUseCase: ManageRegionUseCase,
     private val manageContentUseCase: ManageContentUseCase,
     private val stateRepository: StateRepository,
+    private val manageStateUseCase: ManageStateUseCase,
     private val projectManager: ProjectManager,
-    private val gridManager: GridManager
+    private val gridManager: GridManager,
+    private val exportManager: ExportManager
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(ProjectUiState())
@@ -300,5 +306,71 @@ class ProjectViewModel @Inject constructor(
     
     fun setUnsavedChanges(hasChanges: Boolean) {
         projectManager.setUnsavedChanges(hasChanges)
+    }
+    
+    // State operations
+    fun createState(name: String, color: Int, onCreated: (State) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                val state = manageStateUseCase.getOrCreate(name, color)
+                onCreated(state)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(errorMessage = e.message)
+            }
+        }
+    }
+    
+    // Export operations
+    fun exportProjectToZip(outputFile: java.io.File, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val project = _uiState.value.project ?: return@launch
+                val result = exportManager.exportToZip(project, outputFile)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = result.success,
+                    exportMessage = if (result.success) "Export successful" else result.error
+                )
+                onComplete(result.success, result.error)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = false,
+                    exportMessage = e.message
+                )
+                onComplete(false, e.message)
+            }
+        }
+    }
+    
+    fun exportProjectForPC(outputDir: java.io.File, onComplete: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val project = _uiState.value.project ?: return@launch
+                val result = exportManager.exportForPC(project, outputDir)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = result,
+                    exportMessage = if (result) "Export successful" else "Export failed"
+                )
+                onComplete(result)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = false,
+                    exportMessage = e.message
+                )
+                onComplete(false)
+            }
+        }
+    }
+    
+    fun clearExportMessage() {
+        _uiState.value = _uiState.value.copy(
+            exportSuccess = false,
+            exportMessage = null
+        )
     }
 }

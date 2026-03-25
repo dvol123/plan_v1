@@ -68,6 +68,8 @@
     <string name="media">Медиа</string>
     <string name="add_photo">Добавить фото</string>
     <string name="add_video">Добавить видео</string>
+    <string name="no_media">Нет прикреплённых медиа</string>
+    <string name="no_state">Состояние не выбрано</string>
     
     <!-- Settings -->
     <string name="language">Язык</string>
@@ -84,6 +86,14 @@
     <!-- Permissions -->
     <string name="permission_required">Требуется разрешение</string>
     <string name="camera_permission_denied">Для съёмки фото требуется разрешение камеры. Пожалуйста, предоставьте разрешение в Настройках.</string>
+    
+    <!-- Export/Import -->
+    <string name="export_success">Проект успешно экспортирован</string>
+    <string name="export_error">Ошибка экспорта проекта</string>
+    <string name="import_success">Проект успешно импортирован</string>
+    <string name="import_error">Ошибка импорта проекта</string>
+    <string name="select_export_location">Выберите место экспорта</string>
+    <string name="select_import_file">Выберите ZIP файл для импорта</string>
     
     <!-- Common -->
     <string name="create">Создать</string>

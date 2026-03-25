@@ -68,6 +68,8 @@
     <string name="media">媒体</string>
     <string name="add_photo">添加照片</string>
     <string name="add_video">添加视频</string>
+    <string name="no_media">未附加媒体</string>
+    <string name="no_state">未选择状态</string>
     
     <!-- Settings -->
     <string name="language">语言</string>
@@ -84,6 +86,14 @@
     <!-- Permissions -->
     <string name="permission_required">需要权限</string>
     <string name="camera_permission_denied">拍照功能需要相机权限。请在设置中授予权限。</string>
+    
+    <!-- Export/Import -->
+    <string name="export_success">项目导出成功</string>
+    <string name="export_error">项目导出失败</string>
+    <string name="import_success">项目导入成功</string>
+    <string name="import_error">项目导入失败</string>
+    <string name="select_export_location">选择导出位置</string>
+    <string name="select_import_file">选择要导入的ZIP文件</string>
     
     <!-- Common -->
     <string name="create">创建</string>

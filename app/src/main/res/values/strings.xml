@@ -68,6 +68,8 @@
     <string name="media">Media</string>
     <string name="add_photo">Add Photo</string>
     <string name="add_video">Add Video</string>
+    <string name="no_media">No media attached</string>
+    <string name="no_state">No state selected</string>
     
     <!-- Settings -->
     <string name="language">Language</string>
@@ -84,6 +86,14 @@
     <!-- Permissions -->
     <string name="permission_required">Permission Required</string>
     <string name="camera_permission_denied">Camera permission is required to take photos. Please grant the permission in Settings.</string>
+    
+    <!-- Export/Import -->
+    <string name="export_success">Project exported successfully</string>
+    <string name="export_error">Failed to export project</string>
+    <string name="import_success">Project imported successfully</string>
+    <string name="import_error">Failed to import project</string>
+    <string name="select_export_location">Select export location</string>
+    <string name="select_import_file">Select ZIP file to import</string>
     
     <!-- Common -->
     <string name="create">Create</string>

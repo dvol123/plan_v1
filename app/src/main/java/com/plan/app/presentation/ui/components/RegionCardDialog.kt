@@ -1,6 +1,8 @@
 package com.plan.app.presentation.ui.components
 
 import android.net.Uri
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -26,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.plan.app.R
@@ -33,6 +37,9 @@ import com.plan.app.domain.model.Content
 import com.plan.app.domain.model.ContentType
 import com.plan.app.domain.model.Region
 import com.plan.app.domain.model.State
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
+import androidx.compose.ui.viewinterop.AndroidView
 
 /**
  * Dialog for displaying and editing region details.
@@ -46,7 +53,8 @@ fun RegionCardDialog(
     onDismiss: () -> Unit,
     onSave: (Region) -> Unit,
     onAddPhoto: (Uri) -> Unit,
-    onAddVideo: (Uri) -> Unit
+    onAddVideo: (Uri) -> Unit,
+    onCreateState: (String, Int) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     
@@ -56,6 +64,10 @@ fun RegionCardDialog(
     var type2 by remember { mutableStateOf(region.type2 ?: "") }
     var description by remember { mutableStateOf(region.description ?: "") }
     var note by remember { mutableStateOf(region.note ?: "") }
+    
+    // Fullscreen media viewer state
+    var showFullscreenMedia by remember { mutableStateOf(false) }
+    var selectedMediaIndex by remember { mutableStateOf(0) }
     
     // Media picker launchers
     val photoPicker = rememberLauncherForActivityResult(
@@ -68,6 +80,11 @@ fun RegionCardDialog(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let { onAddVideo(it) }
+    }
+    
+    // Get media contents
+    val mediaContents = remember(region.contents) {
+        region.contents.filter { it.type == ContentType.PHOTO || it.type == ContentType.VIDEO }
     }
     
     Dialog(
@@ -115,50 +132,19 @@ fun RegionCardDialog(
                         .padding(horizontal = 16.dp)
                         .padding(top = 16.dp)
                 ) {
-                    // Media gallery carousel
-                    if (region.contents.isNotEmpty() || isEditing) {
-                        Text(
-                            text = stringResource(R.string.media),
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Existing media items
-                            items(region.contents.filter { it.type == ContentType.PHOTO || it.type == ContentType.VIDEO }) { content ->
-                                MediaThumbnail(
-                                    content = content,
-                                    onClick = {
-                                        // Open full-screen view
-                                    }
-                                )
-                            }
-                            
-                            // Add buttons in editing mode
-                            if (isEditing) {
-                                item {
-                                    AddMediaButton(
-                                        text = stringResource(R.string.add_photo),
-                                        icon = Icons.Default.AddAPhoto,
-                                        onClick = { photoPicker.launch("image/*") }
-                                    )
-                                }
-                                
-                                item {
-                                    AddMediaButton(
-                                        text = stringResource(R.string.add_video),
-                                        icon = Icons.Default.VideoCall,
-                                        onClick = { videoPicker.launch("video/*") }
-                                    )
-                                }
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
+                    // Media gallery carousel at the top
+                    MediaGallerySection(
+                        mediaContents = mediaContents,
+                        isEditing = isEditing,
+                        onMediaClick = { index ->
+                            selectedMediaIndex = index
+                            showFullscreenMedia = true
+                        },
+                        onAddPhoto = { photoPicker.launch("image/*") },
+                        onAddVideo = { videoPicker.launch("video/*") }
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
                     
                     // Name field
                     OutlinedTextField(
@@ -170,44 +156,18 @@ fun RegionCardDialog(
                         singleLine = true
                     )
                     
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     
-                    // State selector
-                    if (isEditing) {
-                        Text(
-                            text = stringResource(R.string.state),
-                            style = MaterialTheme.typography.labelMedium
-                        )
-                        
-                        Spacer(modifier = Modifier.height(4.dp))
-                        
-                        StateSelector(
-                            states = states,
-                            selectedStateId = selectedStateId,
-                            onStateSelected = { selectedStateId = it }
-                        )
-                    } else {
-                        val currentState = states.find { it.id == selectedStateId }
-                        if (currentState != null) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(Color(currentState.color))
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = currentState.name,
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                            }
-                        }
-                    }
+                    // State selector - between name and types
+                    StateSelectorSection(
+                        states = states,
+                        selectedStateId = selectedStateId,
+                        isEditing = isEditing,
+                        onStateSelected = { selectedStateId = it },
+                        onCreateState = onCreateState
+                    )
                     
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     
                     // Type 1
                     OutlinedTextField(
@@ -285,6 +245,106 @@ fun RegionCardDialog(
             }
         }
     }
+    
+    // Fullscreen media viewer
+    if (showFullscreenMedia && mediaContents.isNotEmpty()) {
+        FullscreenMediaViewer(
+            mediaContents = mediaContents,
+            initialIndex = selectedMediaIndex,
+            onDismiss = { showFullscreenMedia = false }
+        )
+    }
+}
+
+@Composable
+private fun MediaGallerySection(
+    mediaContents: List<Content>,
+    isEditing: Boolean,
+    onMediaClick: (Int) -> Unit,
+    onAddPhoto: () -> Unit,
+    onAddVideo: () -> Unit
+) {
+    Column {
+        Text(
+            text = stringResource(R.string.media),
+            style = MaterialTheme.typography.labelLarge
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Show placeholder if no media and not editing
+            if (mediaContents.isEmpty() && !isEditing) {
+                item {
+                    MediaPlaceholder()
+                }
+            } else {
+                // Existing media items
+                items(mediaContents.indices.toList()) { index ->
+                    MediaThumbnail(
+                        content = mediaContents[index],
+                        onClick = { onMediaClick(index) }
+                    )
+                }
+            }
+            
+            // Add buttons in editing mode
+            if (isEditing) {
+                item {
+                    AddMediaButton(
+                        text = stringResource(R.string.add_photo),
+                        icon = Icons.Default.AddAPhoto,
+                        onClick = onAddPhoto
+                    )
+                }
+                
+                item {
+                    AddMediaButton(
+                        text = stringResource(R.string.add_video),
+                        icon = Icons.Default.VideoCall,
+                        onClick = onAddVideo
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MediaPlaceholder() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(80.dp),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.ImageNotSupported,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(32.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.no_media),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -321,9 +381,10 @@ private fun MediaThumbnail(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.Default.VideoFile,
+                            Icons.Default.PlayCircleFilled,
                             contentDescription = "Video",
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(40.dp),
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -371,118 +432,319 @@ private fun AddMediaButton(
 }
 
 @Composable
-private fun StateSelector(
+private fun StateSelectorSection(
     states: List<State>,
     selectedStateId: Long?,
-    onStateSelected: (Long?) -> Unit
+    isEditing: Boolean,
+    onStateSelected: (Long?) -> Unit,
+    onCreateState: (String, Int) -> Unit
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
-    var newStateName by remember { mutableStateOf("") }
-    var selectedColorIndex by remember { mutableStateOf(0) }
     
-    Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        states.forEach { state ->
-            FilterChip(
-                selected = selectedStateId == state.id,
-                onClick = { 
-                    onStateSelected(if (selectedStateId == state.id) null else state.id)
-                },
-                label = { Text(state.name) },
-                leadingIcon = {
-                    Box(
-                        modifier = Modifier
-                            .size(16.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(state.color))
+    Column {
+        Text(
+            text = stringResource(R.string.state),
+            style = MaterialTheme.typography.labelMedium
+        )
+        
+        Spacer(modifier = Modifier.height(4.dp))
+        
+        if (isEditing) {
+            // Horizontal scrollable state chips
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                states.forEach { state ->
+                    FilterChip(
+                        selected = selectedStateId == state.id,
+                        onClick = { 
+                            onStateSelected(if (selectedStateId == state.id) null else state.id)
+                        },
+                        label = { Text(state.name) },
+                        leadingIcon = {
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color(state.color))
+                            )
+                        }
                     )
                 }
-            )
-        }
-        
-        // Create new state button
-        FilterChip(
-            selected = false,
-            onClick = { showCreateDialog = true },
-            label = { Text(stringResource(R.string.new_state)) },
-            leadingIcon = {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                
+                // Create new state button
+                FilterChip(
+                    selected = false,
+                    onClick = { showCreateDialog = true },
+                    label = { Text(stringResource(R.string.new_state)) },
+                    leadingIcon = {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
+                )
             }
-        )
+        } else {
+            // View mode - show selected state
+            val currentState = states.find { it.id == selectedStateId }
+            if (currentState != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(currentState.color))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = currentState.name,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            } else {
+                Text(
+                    text = stringResource(R.string.no_state),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
     
     // Create state dialog
     if (showCreateDialog) {
-        AlertDialog(
-            onDismissRequest = { showCreateDialog = false },
-            title = { Text(stringResource(R.string.create_state)) },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = newStateName,
-                        onValueChange = { newStateName = it },
-                        label = { Text(stringResource(R.string.state_name)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Text(
-                        text = stringResource(R.string.select_color),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        State.PREDEFINED_COLORS.forEachIndexed { index, color ->
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(color))
-                                    .clickable { selectedColorIndex = index }
-                                    .then(
-                                        if (selectedColorIndex == index) {
-                                            Modifier.padding(4.dp)
-                                        } else Modifier
-                                    )
-                            ) {
-                                if (selectedColorIndex == index) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = "Selected",
-                                        tint = Color.White,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(4.dp)
-                                    )
-                                }
+        CreateStateDialog(
+            onDismiss = { showCreateDialog = false },
+            onCreate = { name, color ->
+                onCreateState(name, color)
+                showCreateDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun CreateStateDialog(
+    onDismiss: () -> Unit,
+    onCreate: (String, Int) -> Unit
+) {
+    var stateName by remember { mutableStateOf("") }
+    var selectedColorIndex by remember { mutableStateOf(0) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.create_state)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = stateName,
+                    onValueChange = { stateName = it },
+                    label = { Text(stringResource(R.string.state_name)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = stringResource(R.string.select_color),
+                    style = MaterialTheme.typography.labelMedium
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    State.PREDEFINED_COLORS.forEachIndexed { index, color ->
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(color))
+                                .clickable { selectedColorIndex = index }
+                        ) {
+                            if (selectedColorIndex == index) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = "Selected",
+                                    tint = Color.White,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(8.dp)
+                                )
                             }
                         }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    // Create new state - this would be done through viewModel
-                    showCreateDialog = false
-                    newStateName = ""
-                }) {
-                    Text(stringResource(R.string.create))
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (stateName.isNotBlank()) {
+                        onCreate(stateName, State.PREDEFINED_COLORS[selectedColorIndex])
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateDialog = false }) {
-                    Text(stringResource(R.string.cancel))
+            ) {
+                Text(stringResource(R.string.create))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+private fun FullscreenMediaViewer(
+    mediaContents: List<Content>,
+    initialIndex: Int,
+    onDismiss: () -> Unit
+) {
+    var currentIndex by remember { mutableIntStateOf(initialIndex) }
+    val content = mediaContents.getOrNull(currentIndex) ?: return
+    
+    // Video player state
+    val context = LocalContext.current
+    var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
+    
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutsideConstraint = true
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            // Close button
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .zIndex(1f)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+            
+            // Media content
+            when (content.type) {
+                ContentType.PHOTO -> {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(content.data)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Photo",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+                ContentType.VIDEO -> {
+                    // Initialize ExoPlayer
+                    LaunchedEffect(content.data) {
+                        exoPlayer?.release()
+                        exoPlayer = ExoPlayer.Builder(context).build().apply {
+                            val mediaItem = androidx.media3.common.MediaItem.fromUri(content.data)
+                            setMediaItem(mediaItem)
+                            prepare()
+                            playWhenReady = true
+                        }
+                    }
+                    
+                    // Cleanup
+                    DisposableEffect(Unit) {
+                        onDispose {
+                            exoPlayer?.release()
+                            exoPlayer = null
+                        }
+                    }
+                    
+                    exoPlayer?.let { player ->
+                        AndroidView(
+                            factory = {
+                                PlayerView(it).apply {
+                                    this.player = player
+                                    layoutParams = FrameLayout.LayoutParams(
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        ViewGroup.LayoutParams.MATCH_PARENT
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+                ContentType.TEXT -> {
+                    // Not shown in fullscreen
                 }
             }
-        )
+            
+            // Navigation arrows for multiple media
+            if (mediaContents.size > 1) {
+                // Previous button
+                if (currentIndex > 0) {
+                    IconButton(
+                        onClick = { currentIndex-- },
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(16.dp)
+                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.KeyboardArrowLeft,
+                            contentDescription = "Previous",
+                            tint = Color.White,
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+                }
+                
+                // Next button
+                if (currentIndex < mediaContents.size - 1) {
+                    IconButton(
+                        onClick = { currentIndex++ },
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(16.dp)
+                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.KeyboardArrowRight,
+                            contentDescription = "Next",
+                            tint = Color.White,
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+                }
+                
+                // Page indicator
+                Text(
+                    text = "${currentIndex + 1} / ${mediaContents.size}",
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
+        }
     }
 }
