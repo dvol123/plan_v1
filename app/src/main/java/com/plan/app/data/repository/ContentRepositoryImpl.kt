@@ -35,7 +35,11 @@ class ContentRepositoryImpl @Inject constructor(
     override suspend fun insertContents(contents: List<Content>) {
         contentDao.insertContents(contents.map { it.toEntity() })
     }
-    
+
+    override suspend fun insert(content: Content): Long {
+        return contentDao.insertContent(content.toEntity())
+    }
+
     override suspend fun deleteContent(content: Content) {
         contentDao.deleteContent(content.toEntity())
     }

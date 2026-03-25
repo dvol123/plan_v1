@@ -54,14 +54,20 @@
     
     <!-- Region -->
     <string name="create_region">创建区域</string>
+    <string name="create_region_title">创建新区域</string>
     <string name="edit_region">编辑区域</string>
     <string name="region_details">区域详情</string>
     <string name="region_name">区域名称</string>
+    <string name="region_name_hint">输入区域名称</string>
     <string name="state">状态</string>
     <string name="state_name">状态名称</string>
     <string name="new_state">新建状态</string>
     <string name="create_state">创建状态</string>
     <string name="select_color">选择颜色</string>
+    <string name="state_already_exists">此名称的状态已存在</string>
+    <string name="existing_states">现有状态：</string>
+    <string name="select">选择</string>
+    <string name="selected_state">已选择：%s</string>
     
     <!-- Regions -->
     <string name="clear_regions">清除区域</string>
@@ -97,6 +103,11 @@
     <string name="import_error">项目导入失败</string>
     <string name="select_export_location">选择导出位置</string>
     <string name="select_import_file">选择要导入的ZIP文件</string>
+
+    <!-- Share -->
+    <string name="share_project">分享项目</string>
+    <string name="export_selected">导出所选</string>
+    <string name="export_all">导出全部</string>
     
     <!-- Common -->
     <string name="create">创建</string>

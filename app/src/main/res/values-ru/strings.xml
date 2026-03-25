@@ -54,14 +54,20 @@
     
     <!-- Region -->
     <string name="create_region">Создать область</string>
+    <string name="create_region_title">Создать новую область</string>
     <string name="edit_region">Редактировать область</string>
     <string name="region_details">Детали области</string>
     <string name="region_name">Название области</string>
+    <string name="region_name_hint">Введите название области</string>
     <string name="state">Состояние</string>
     <string name="state_name">Название состояния</string>
     <string name="new_state">Новое состояние</string>
     <string name="create_state">Создать состояние</string>
     <string name="select_color">Выберите цвет</string>
+    <string name="state_already_exists">Состояние с таким названием уже существует</string>
+    <string name="existing_states">Существующие состояния:</string>
+    <string name="select">Выбрать</string>
+    <string name="selected_state">Выбрано: %s</string>
     
     <!-- Regions -->
     <string name="clear_regions">Очистить области</string>
@@ -97,6 +103,11 @@
     <string name="import_error">Ошибка импорта проекта</string>
     <string name="select_export_location">Выберите место экспорта</string>
     <string name="select_import_file">Выберите ZIP файл для импорта</string>
+
+    <!-- Share -->
+    <string name="share_project">Поделиться проектом</string>
+    <string name="export_selected">Экспортировать выбранный</string>
+    <string name="export_all">Экспортировать все</string>
     
     <!-- Common -->
     <string name="create">Создать</string>
