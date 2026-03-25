@@ -402,7 +402,10 @@ fun ProjectScreen(
             },
             onCreateState = { name, color ->
                 viewModel.createState(name, color) { newState ->
-                    // Optionally auto-select the newly created state
+                    // Auto-select the newly created state for this region
+                    uiState.selectedRegion?.let { region ->
+                        viewModel.updateRegion(region.copy(stateId = newState.id))
+                    }
                 }
             }
         )
