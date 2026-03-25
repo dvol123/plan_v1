@@ -12,7 +12,7 @@ import com.plan.app.domain.model.ContentType
 import com.plan.app.domain.model.Region
 import com.plan.app.domain.repository.RegionRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -27,22 +27,24 @@ class RegionRepositoryImpl @Inject constructor(
 ) : RegionRepository {
     
     override fun getRegionsByProject(projectId: Long): Flow<List<Region>> {
-        return regionDao.getRegionsByProject(projectId).map { entities ->
-            entities.map { it.toDomain() }
+        return regionDao.getRegionsByProject(projectId).mapLatest { entities ->
+            entities.map { entity -> entity.toDomainWithContents() }
         }
     }
     
     override suspend fun getRegionsByProjectOnce(projectId: Long): List<Region> {
-        return regionDao.getRegionsByProjectOnce(projectId).map { it.toDomain() }
+        return regionDao.getRegionsByProjectOnce(projectId).map { entity -> 
+            entity.toDomainWithContents() 
+        }
     }
     
     override suspend fun getRegionById(regionId: Long): Region? {
-        return regionDao.getRegionById(regionId)?.toDomain()
+        return regionDao.getRegionById(regionId)?.toDomainWithContents()
     }
     
     override fun searchRegions(projectId: Long, query: String): Flow<List<Region>> {
-        return regionDao.searchRegions(projectId, query).map { entities ->
-            entities.map { it.toDomain() }
+        return regionDao.searchRegions(projectId, query).mapLatest { entities ->
+            entities.map { entity -> entity.toDomainWithContents() }
         }
     }
     
@@ -62,12 +64,17 @@ class RegionRepositoryImpl @Inject constructor(
         regionDao.deleteRegionsByProject(projectId)
     }
     
-    private fun RegionEntity.toDomain(): Region {
+    private suspend fun RegionEntity.toDomainWithContents(): Region {
         val cellList: List<Cell> = try {
             gson.fromJson(cellsJson, object : TypeToken<List<Cell>>() {}.type) ?: emptyList()
         } catch (e: Exception) {
             emptyList()
         }
+        
+        // Load contents for this region
+        val contentEntities = contentDao.getContentsByRegionOnce(id)
+        val contents = contentEntities.map { it.toDomain() }
+        
         return Region(
             id = id,
             projectId = projectId,
@@ -78,6 +85,7 @@ class RegionRepositoryImpl @Inject constructor(
             description = description,
             note = note,
             cells = cellList,
+            contents = contents,
             createdAt = createdAt,
             updatedAt = updatedAt
         )
@@ -96,6 +104,22 @@ class RegionRepositoryImpl @Inject constructor(
             cellsJson = gson.toJson(cells),
             createdAt = createdAt,
             updatedAt = updatedAt
+        )
+    }
+    
+    // Extension to convert ContentEntity to Content domain model
+    private fun ContentEntity.toDomain(): Content {
+        return Content(
+            id = id,
+            regionId = regionId,
+            type = when (type) {
+                com.plan.app.data.local.entity.ContentType.TEXT -> ContentType.TEXT
+                com.plan.app.data.local.entity.ContentType.PHOTO -> ContentType.PHOTO
+                com.plan.app.data.local.entity.ContentType.VIDEO -> ContentType.VIDEO
+            },
+            data = data,
+            sortOrder = sortOrder,
+            createdAt = createdAt
         )
     }
 }

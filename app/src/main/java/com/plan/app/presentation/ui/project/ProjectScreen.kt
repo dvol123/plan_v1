@@ -390,10 +390,20 @@ fun ProjectScreen(
             onSave = { updatedRegion ->
                 viewModel.updateRegion(updatedRegion)
             },
-            onAddPhoto = { /* TODO */ },
-            onAddVideo = { /* TODO */ },
+            onAddPhoto = { uri ->
+                uiState.selectedRegion?.let { region ->
+                    viewModel.addPhotoToRegion(context, region.id, uri)
+                }
+            },
+            onAddVideo = { uri ->
+                uiState.selectedRegion?.let { region ->
+                    viewModel.addVideoToRegion(context, region.id, uri)
+                }
+            },
             onCreateState = { name, color ->
-                viewModel.createState(name, color)
+                viewModel.createState(name, color) { newState ->
+                    // Optionally auto-select the newly created state
+                }
             }
         )
     }
@@ -405,6 +415,11 @@ fun ProjectScreen(
             onDismiss = { viewModel.hideCreateRegionDialog() },
             onCreate = { name, stateId, type1, type2, description, note ->
                 viewModel.createRegion(name, stateId, type1, type2, description, note)
+            },
+            onCreateState = { name, color ->
+                viewModel.createState(name, color) { newState ->
+                    // State will appear in list automatically via Flow
+                }
             }
         )
     }

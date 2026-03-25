@@ -1,5 +1,7 @@
 package com.plan.app.presentation.viewmodel
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.plan.app.domain.manager.ExportManager
@@ -7,6 +9,7 @@ import com.plan.app.domain.manager.GridManager
 import com.plan.app.domain.manager.ProjectManager
 import com.plan.app.domain.model.Cell
 import com.plan.app.domain.model.Content
+import com.plan.app.domain.model.ContentType
 import com.plan.app.domain.model.Project
 import com.plan.app.domain.model.Region
 import com.plan.app.domain.model.State
@@ -24,6 +27,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 import javax.inject.Inject
 
 /**
@@ -345,6 +350,91 @@ class ProjectViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(errorMessage = e.message)
             }
         }
+    }
+    
+    // Media operations
+    fun addPhotoToRegion(context: Context, regionId: Long, uri: Uri) {
+        viewModelScope.launch {
+            try {
+                // Copy file to app's permanent storage
+                val savedPath = copyMediaToPermanentStorage(context, uri, regionId, "photo")
+                
+                // Get next sort order
+                val sortOrder = manageContentUseCase.getByRegionOnce(regionId).size
+                
+                // Create content record
+                val content = Content(
+                    regionId = regionId,
+                    type = ContentType.PHOTO,
+                    data = savedPath,
+                    sortOrder = sortOrder
+                )
+                manageContentUseCase.add(content)
+                
+                // Refresh the selected region
+                refreshSelectedRegion()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(errorMessage = "Failed to save photo: ${e.message}")
+            }
+        }
+    }
+    
+    fun addVideoToRegion(context: Context, regionId: Long, uri: Uri) {
+        viewModelScope.launch {
+            try {
+                // Copy file to app's permanent storage
+                val savedPath = copyMediaToPermanentStorage(context, uri, regionId, "video")
+                
+                // Get next sort order
+                val sortOrder = manageContentUseCase.getByRegionOnce(regionId).size
+                
+                // Create content record
+                val content = Content(
+                    regionId = regionId,
+                    type = ContentType.VIDEO,
+                    data = savedPath,
+                    sortOrder = sortOrder
+                )
+                manageContentUseCase.add(content)
+                
+                // Refresh the selected region
+                refreshSelectedRegion()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(errorMessage = "Failed to save video: ${e.message}")
+            }
+        }
+    }
+    
+    private suspend fun refreshSelectedRegion() {
+        _uiState.value.selectedRegion?.let { currentRegion ->
+            val updatedRegion = regionRepository.getRegionById(currentRegion.id)
+            if (updatedRegion != null) {
+                _uiState.value = _uiState.value.copy(selectedRegion = updatedRegion)
+            }
+        }
+    }
+    
+    private fun copyMediaToPermanentStorage(context: Context, sourceUri: Uri, regionId: Long, type: String): String {
+        // Create directory for media files
+        val mediaDir = File(context.filesDir, "media")
+        if (!mediaDir.exists()) {
+            mediaDir.mkdirs()
+        }
+        
+        // Create unique filename
+        val timestamp = System.currentTimeMillis()
+        val extension = if (type == "photo") "jpg" else "mp4"
+        val fileName = "${type}_${regionId}_$timestamp.$extension"
+        val destFile = File(mediaDir, fileName)
+        
+        // Copy from source to destination
+        context.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
+            FileOutputStream(destFile).use { outputStream ->
+                inputStream.copyTo(outputStream)
+            }
+        }
+        
+        return destFile.absolutePath
     }
     
     // Export operations
