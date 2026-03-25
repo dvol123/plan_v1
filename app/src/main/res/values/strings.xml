@@ -68,10 +68,7 @@
     <string name="existing_states">Existing states:</string>
     <string name="select">Select</string>
     <string name="selected_state">Selected: %s</string>
-    <string name="field_required">This field is required</string>
-    <string name="description">Description</string>
-    <string name="note">Note</string>
-    
+
     <!-- Regions -->
     <string name="clear_regions">Clear Regions</string>
     <string name="clear_regions_confirmation">Are you sure you want to delete all regions? This cannot be undone.</string>
