@@ -1,7 +1,11 @@
 package com.plan.app.presentation.viewmodel
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
+import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.plan.app.domain.manager.ExportManager
@@ -20,6 +24,7 @@ import com.plan.app.domain.usecase.ManageProjectUseCase
 import com.plan.app.domain.usecase.ManageRegionUseCase
 import com.plan.app.domain.usecase.ManageStateUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
@@ -444,27 +450,132 @@ class ProjectViewModel @Inject constructor(
         }
     }
     
-    private fun copyMediaToPermanentStorage(context: Context, sourceUri: Uri, regionId: Long, type: String): String {
-        // Create directory for media files
-        val mediaDir = File(context.filesDir, "media")
-        if (!mediaDir.exists()) {
-            mediaDir.mkdirs()
+    private suspend fun copyMediaToPermanentStorage(context: Context, sourceUri: Uri, regionId: Long, type: String): String {
+        return withContext(Dispatchers.IO) {
+            // Create directory for media files
+            val mediaDir = File(context.filesDir, "media")
+            if (!mediaDir.exists()) {
+                mediaDir.mkdirs()
+            }
+            
+            // Create unique filename
+            val timestamp = System.currentTimeMillis()
+            val extension = if (type == "photo") "jpg" else "mp4"
+            val fileName = "${type}_${regionId}_$timestamp.$extension"
+            val destFile = File(mediaDir, fileName)
+            
+            if (type == "photo") {
+                // For photos: handle EXIF orientation
+                copyPhotoWithCorrectOrientation(context, sourceUri, destFile)
+            } else {
+                // For videos: just copy the file (orientation is handled by video player)
+                context.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
+                    FileOutputStream(destFile).use { outputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
+                }
+            }
+            
+            destFile.absolutePath
         }
-        
-        // Create unique filename
-        val timestamp = System.currentTimeMillis()
-        val extension = if (type == "photo") "jpg" else "mp4"
-        val fileName = "${type}_${regionId}_$timestamp.$extension"
-        val destFile = File(mediaDir, fileName)
-        
-        // Copy from source to destination - this preserves all metadata including EXIF orientation
-        context.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
-            FileOutputStream(destFile).use { outputStream ->
-                inputStream.copyTo(outputStream)
+    }
+    
+    /**
+     * Copy photo with correct orientation based on EXIF data.
+     * This ensures the photo is displayed correctly regardless of how it was captured.
+     */
+    private fun copyPhotoWithCorrectOrientation(context: Context, sourceUri: Uri, destFile: File) {
+        try {
+            // Open input stream and copy to a temp file first (to read EXIF)
+            val tempFile = File(context.cacheDir, "temp_photo_${System.currentTimeMillis()}.jpg")
+            context.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
+                FileOutputStream(tempFile).use { outputStream ->
+                    inputStream.copyTo(outputStream)
+                }
+            }
+            
+            // Read EXIF orientation from temp file
+            val exif = ExifInterface(tempFile.absolutePath)
+            val orientation = exif.getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL
+            )
+            
+            // Calculate rotation angle from EXIF orientation
+            val rotationDegrees = when (orientation) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> 0f // Handle flip separately if needed
+                else -> 0f
+            }
+            
+            // Also check for flipped orientations
+            val needsFlip = orientation == ExifInterface.ORIENTATION_FLIP_HORIZONTAL ||
+                           orientation == ExifInterface.ORIENTATION_FLIP_VERTICAL ||
+                           orientation == ExifInterface.ORIENTATION_TRANSVERSE ||
+                           orientation == ExifInterface.ORIENTATION_TRANSPOSE
+            
+            if (rotationDegrees != 0f || needsFlip) {
+                // Decode bitmap, rotate/flip, and save
+                val bitmap = BitmapFactory.decodeFile(tempFile.absolutePath)
+                if (bitmap != null) {
+                    val matrix = Matrix()
+                    
+                    // Handle rotation
+                    if (rotationDegrees != 0f) {
+                        matrix.postRotate(rotationDegrees)
+                    }
+                    
+                    // Handle flips
+                    when (orientation) {
+                        ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+                        ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+                        ExifInterface.ORIENTATION_TRANSPOSE -> {
+                            matrix.postRotate(90f)
+                            matrix.postScale(-1f, 1f)
+                        }
+                        ExifInterface.ORIENTATION_TRANSVERSE -> {
+                            matrix.postRotate(270f)
+                            matrix.postScale(-1f, 1f)
+                        }
+                    }
+                    
+                    // Create rotated/flipped bitmap
+                    val rotatedBitmap = Bitmap.createBitmap(
+                        bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
+                    )
+                    
+                    // Save to destination (as normal orientation, no EXIF rotation needed)
+                    FileOutputStream(destFile).use { outputStream ->
+                        rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
+                    }
+                    
+                    // Recycle bitmaps
+                    if (rotatedBitmap != bitmap) {
+                        rotatedBitmap.recycle()
+                    }
+                    bitmap.recycle()
+                    
+                    // Delete temp file
+                    tempFile.delete()
+                    return
+                }
+            }
+            
+            // If no rotation needed or bitmap decode failed, just copy the file
+            tempFile.copyTo(destFile, overwrite = true)
+            tempFile.delete()
+            
+        } catch (e: Exception) {
+            android.util.Log.e("ProjectViewModel", "Error handling photo orientation", e)
+            // Fallback: just copy the file as-is
+            context.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
+                FileOutputStream(destFile).use { outputStream ->
+                    inputStream.copyTo(outputStream)
+                }
             }
         }
-        
-        return destFile.absolutePath
     }
     
     // Export operations
