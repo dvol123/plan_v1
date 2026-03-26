@@ -11,7 +11,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -261,10 +260,22 @@ fun MainScreen(
                         onValueChange = { viewModel.setSearchQuery(it) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp),
-                        placeholder = { Text(stringResource(R.string.search_projects)) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                        singleLine = true
+                            .height(40.dp),
+                        placeholder = { 
+                            Text(
+                                stringResource(R.string.search_projects),
+                                style = MaterialTheme.typography.bodySmall
+                            ) 
+                        },
+                        leadingIcon = { 
+                            Icon(
+                                Icons.Default.Search, 
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            ) 
+                        },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodySmall
                     )
                 },
                 actions = {
@@ -413,10 +424,6 @@ fun MainScreen(
                 },
                 onViewDetailsClick = {
                     showViewDialog = true
-                },
-                onHomeDoubleTap = {
-                    // Double-tap on home deselects the project
-                    viewModel.selectProject(null)
                 }
             )
         }
@@ -447,7 +454,7 @@ fun MainScreen(
                         ProjectListItem(
                             project = project,
                             isSelected = uiState.selectedProject?.id == project.id,
-                            onSelect = { viewModel.selectProject(project) },
+                            onSelect = { viewModel.toggleProjectSelection(project) },
                             onThumbnailClick = {
                                 fullscreenPhotoUri = project.photoUri
                             }
@@ -593,7 +600,6 @@ fun MainScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ProjectListItem(
     project: Project,
@@ -606,10 +612,7 @@ private fun ProjectListItem(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(12.dp))
-            .combinedClickable(
-                onClick = { }, // Single tap does nothing for selection
-                onDoubleClick = onSelect // Double-tap selects the project
-            ),
+            .clickable { onSelect() }, // Single tap selects/deselects
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) {
                 MaterialTheme.colorScheme.primaryContainer
@@ -662,28 +665,19 @@ private fun ProjectListItem(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MainBottomBar(
     selectedProject: Project?,
     onViewClick: () -> Unit,
     onEditClick: () -> Unit,
-    onViewDetailsClick: () -> Unit,
-    onHomeDoubleTap: () -> Unit
+    onViewDetailsClick: () -> Unit
 ) {
     NavigationBar {
         NavigationBarItem(
             selected = true,
-            onClick = { /* Single tap - already on main screen */ },
+            onClick = { /* Already on main screen */ },
             icon = { 
-                Box(
-                    modifier = Modifier.combinedClickable(
-                        onClick = { /* Single tap - already on main screen */ },
-                        onDoubleClick = onHomeDoubleTap
-                    )
-                ) {
-                    Icon(Icons.Default.Home, contentDescription = "Home")
-                }
+                Icon(Icons.Default.Home, contentDescription = "Home")
             },
             label = { Text(stringResource(R.string.home)) }
         )

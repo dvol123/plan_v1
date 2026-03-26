@@ -48,7 +48,9 @@ data class ProjectUiState(
     val showClearConfirm: Boolean = false,
     val errorMessage: String? = null,
     val exportSuccess: Boolean = false,
-    val exportMessage: String? = null
+    val exportMessage: String? = null,
+    val shouldCloseRegionCard: Boolean = false,
+    val showGridSizeControls: Boolean = true // Controls visibility of grid size controls
 )
 
 /**
@@ -100,7 +102,9 @@ class ProjectViewModel @Inject constructor(
                 val project = manageProjectUseCase.getById(projectId)
                 _uiState.value = _uiState.value.copy(
                     project = project,
-                    isLoading = false
+                    isLoading = false,
+                    // Show grid controls only if no regions exist (cellSize is still at default)
+                    showGridSizeControls = project?.cellSize == 1
                 )
                 project?.let {
                     projectManager.setCurrentProject(it)
@@ -201,6 +205,10 @@ class ProjectViewModel @Inject constructor(
     
     fun setCellSize(size: Int) {
         gridManager.setCellSize(size)
+        // Hide grid controls after user confirms a size (if size > 1, it means user changed it)
+        if (size > 1) {
+            _uiState.value = _uiState.value.copy(showGridSizeControls = false)
+        }
         viewModelScope.launch {
             _uiState.value.project?.let { project ->
                 manageProjectUseCase.update(project.copy(cellSize = size))
@@ -253,7 +261,8 @@ class ProjectViewModel @Inject constructor(
                 manageRegionUseCase.update(region)
                 _uiState.value = _uiState.value.copy(
                     selectedRegion = region,
-                    isEditingRegion = false
+                    isEditingRegion = false,
+                    shouldCloseRegionCard = true // Signal to close dialog after save
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = e.message)
@@ -261,6 +270,10 @@ class ProjectViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isLoading = false)
             }
         }
+    }
+    
+    fun onRegionCardClosed() {
+        _uiState.value = _uiState.value.copy(shouldCloseRegionCard = false)
     }
     
     fun showDeleteConfirm() {
@@ -303,6 +316,8 @@ class ProjectViewModel @Inject constructor(
                     manageRegionUseCase.deleteAllByProject(project.id)
                 }
                 hideClearConfirm()
+                // Reset grid controls visibility when all regions are cleared
+                _uiState.value = _uiState.value.copy(showGridSizeControls = true)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = e.message)
             } finally {

@@ -15,9 +15,9 @@
     <string name="exit">Exit</string>
     
     <!-- Bottom bar -->
-    <string name="home">Home</string>
-    <string name="star">Star</string>
-    <string name="edit">Edit</string>
+    <string name="home">Base</string>
+    <string name="star">Project</string>
+    <string name="edit">Change</string>
     <string name="view">View</string>
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>

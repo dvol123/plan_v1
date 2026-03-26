@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.plan.app.R
 import com.plan.app.domain.model.State
 
@@ -65,23 +67,42 @@ fun CreateRegionDialog(
         selectedStateId = matchedState?.id
     }
     
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Surface(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.85f),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface
         ) {
             Column(
                 modifier = Modifier
-                    .padding(16.dp)
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
             ) {
-                Text(
-                    text = stringResource(R.string.create_region),
-                    style = MaterialTheme.typography.titleLarge
-                )
+                // Header with title and close button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.create_region),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
                 
-                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 
                 // Name (required)
                 OutlinedTextField(
@@ -331,6 +352,8 @@ fun CreateRegionDialog(
                         Text(stringResource(R.string.create))
                     }
                 }
+                
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }

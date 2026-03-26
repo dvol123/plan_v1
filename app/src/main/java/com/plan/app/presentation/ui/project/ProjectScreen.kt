@@ -87,6 +87,14 @@ fun ProjectScreen(
         }
     }
     
+    // Handle region card close after save
+    LaunchedEffect(uiState.shouldCloseRegionCard) {
+        if (uiState.shouldCloseRegionCard) {
+            viewModel.closeRegionCard()
+            viewModel.onRegionCardClosed()
+        }
+    }
+    
     // Export message handling
     LaunchedEffect(uiState.exportMessage) {
         uiState.exportMessage?.let {
@@ -193,8 +201,8 @@ fun ProjectScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .padding(bottom = 8.dp),
+                            .padding(horizontal = 12.dp)
+                            .padding(bottom = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         OutlinedTextField(
@@ -202,10 +210,19 @@ fun ProjectScreen(
                             onValueChange = { viewModel.setSearchQuery(it) },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp),
-                            placeholder = { Text(stringResource(R.string.search_regions)) },
+                                .height(40.dp),
+                            placeholder = { 
+                                Text(
+                                    stringResource(R.string.search_regions),
+                                    style = MaterialTheme.typography.bodySmall
+                                ) 
+                            },
                             leadingIcon = { 
-                                Icon(Icons.Default.Search, contentDescription = null) 
+                                Icon(
+                                    Icons.Default.Search, 
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                ) 
                             },
                             trailingIcon = {
                                 if (uiState.searchQuery.isNotEmpty()) {
@@ -214,7 +231,8 @@ fun ProjectScreen(
                                     }
                                 }
                             },
-                            singleLine = true
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
@@ -330,11 +348,6 @@ fun ProjectScreen(
                         onNavigateBack()
                     }
                 },
-                onHomeDoubleClick = {
-                    // Double-tap on home always navigates back
-                    viewModel.deselectRegion()
-                    onNavigateBack()
-                },
                 onEditRegionClick = { viewModel.editRegion() },
                 onViewRegionClick = { viewModel.viewRegion() },
                 onSaveClick = {
@@ -390,8 +403,8 @@ fun ProjectScreen(
                         isZoomEnabled = true // Enable zoom in both view and edit modes
                     )
                     
-                    // Cell size slider in editing mode
-                    if (isEditing) {
+                    // Cell size slider in editing mode - only show if flag is set and no regions exist
+                    if (isEditing && uiState.showGridSizeControls && regions.isEmpty()) {
                         CellSizeControls(
                             cellSize = cellSizeSlider,
                             onCellSizeChange = { newValue ->
@@ -400,7 +413,7 @@ fun ProjectScreen(
                             onCellSizeConfirmed = { 
                                 viewModel.setCellSize(it.toInt())
                             },
-                            hasRegions = regions.isNotEmpty(),
+                            hasRegions = false, // Always false here since we check regions.isEmpty() above
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .padding(bottom = 16.dp)
@@ -922,29 +935,15 @@ private fun ProjectBottomBar(
     isEditingRegion: Boolean,
     hasRegionChanges: Boolean,
     onHomeClick: () -> Unit,
-    onHomeDoubleClick: () -> Unit,
     onEditRegionClick: () -> Unit,
     onViewRegionClick: () -> Unit,
     onSaveClick: () -> Unit,
     onSaveRegionClick: () -> Unit
 ) {
-    // Track last click time for double-tap detection
-    var lastHomeClickTime by remember { mutableStateOf(0L) }
-    
     NavigationBar {
         NavigationBarItem(
             selected = false,
-            onClick = {
-                val currentTime = System.currentTimeMillis()
-                if (currentTime - lastHomeClickTime < 300) {
-                    // Double tap
-                    onHomeDoubleClick()
-                } else {
-                    // Single tap
-                    onHomeClick()
-                }
-                lastHomeClickTime = currentTime
-            },
+            onClick = onHomeClick,
             icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
             label = { Text(stringResource(R.string.home)) }
         )

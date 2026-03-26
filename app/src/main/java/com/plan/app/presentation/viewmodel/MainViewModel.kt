@@ -69,6 +69,15 @@ class MainViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(selectedProject = project)
     }
     
+    fun toggleProjectSelection(project: Project) {
+        // If clicking on already selected project, deselect it
+        if (_uiState.value.selectedProject?.id == project.id) {
+            _uiState.value = _uiState.value.copy(selectedProject = null)
+        } else {
+            _uiState.value = _uiState.value.copy(selectedProject = project)
+        }
+    }
+    
     fun setSearchQuery(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
     }
