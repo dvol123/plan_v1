@@ -492,6 +492,7 @@ class ProjectViewModel @Inject constructor(
     /**
      * Copy photo with correct orientation based on EXIF data.
      * This ensures the photo is displayed correctly regardless of how it was captured.
+     * Uses sampling for large images to prevent OutOfMemoryError.
      */
     private fun copyPhotoWithCorrectOrientation(context: Context, sourceUri: Uri, destFile: File) {
         try {
@@ -526,49 +527,76 @@ class ProjectViewModel @Inject constructor(
                            orientation == ExifInterface.ORIENTATION_TRANSPOSE
             
             if (rotationDegrees != 0f || needsFlip) {
-                // Decode bitmap, rotate/flip, and save
-                val bitmap = BitmapFactory.decodeFile(tempFile.absolutePath)
+                // Decode bitmap with sampling to prevent OOM
+                val options = BitmapFactory.Options().apply {
+                    // First decode with inJustDecodeBounds to get dimensions
+                    inJustDecodeBounds = true
+                    BitmapFactory.decodeFile(tempFile.absolutePath, this)
+                    
+                    // Calculate sample size for reasonable image size (max 2048px)
+                    val maxDimension = 2048
+                    val maxDim = maxOf(outWidth, outHeight)
+                    inSampleSize = if (maxDim > maxDimension) {
+                        Math.ceil(maxDim.toDouble() / maxDimension).toInt()
+                    } else {
+                        1
+                    }
+                    
+                    // Now decode with sample size
+                    inJustDecodeBounds = false
+                }
+                
+                val bitmap = BitmapFactory.decodeFile(tempFile.absolutePath, options)
                 if (bitmap != null) {
-                    val matrix = Matrix()
-                    
-                    // Handle rotation
-                    if (rotationDegrees != 0f) {
-                        matrix.postRotate(rotationDegrees)
-                    }
-                    
-                    // Handle flips
-                    when (orientation) {
-                        ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
-                        ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
-                        ExifInterface.ORIENTATION_TRANSPOSE -> {
-                            matrix.postRotate(90f)
-                            matrix.postScale(-1f, 1f)
+                    try {
+                        val matrix = Matrix()
+                        
+                        // Handle rotation
+                        if (rotationDegrees != 0f) {
+                            matrix.postRotate(rotationDegrees)
                         }
-                        ExifInterface.ORIENTATION_TRANSVERSE -> {
-                            matrix.postRotate(270f)
-                            matrix.postScale(-1f, 1f)
+                        
+                        // Handle flips
+                        when (orientation) {
+                            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+                            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+                            ExifInterface.ORIENTATION_TRANSPOSE -> {
+                                matrix.postRotate(90f)
+                                matrix.postScale(-1f, 1f)
+                            }
+                            ExifInterface.ORIENTATION_TRANSVERSE -> {
+                                matrix.postRotate(270f)
+                                matrix.postScale(-1f, 1f)
+                            }
                         }
+                        
+                        // Create rotated/flipped bitmap
+                        val rotatedBitmap = Bitmap.createBitmap(
+                            bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
+                        )
+                        
+                        // Save to destination (as normal orientation, no EXIF rotation needed)
+                        FileOutputStream(destFile).use { outputStream ->
+                            rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
+                        }
+                        
+                        // Recycle bitmaps
+                        if (rotatedBitmap != bitmap) {
+                            rotatedBitmap.recycle()
+                        }
+                        bitmap.recycle()
+                        
+                        // Delete temp file
+                        tempFile.delete()
+                        return
+                    } catch (oom: OutOfMemoryError) {
+                        android.util.Log.e("ProjectViewModel", "OOM while processing image, using fallback", oom)
+                        // Try to recycle the bitmap
+                        bitmap.recycle()
+                        // Fallback: just copy the file as-is without transformation
+                        tempFile.copyTo(destFile, overwrite = true)
+                        tempFile.delete()
                     }
-                    
-                    // Create rotated/flipped bitmap
-                    val rotatedBitmap = Bitmap.createBitmap(
-                        bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
-                    )
-                    
-                    // Save to destination (as normal orientation, no EXIF rotation needed)
-                    FileOutputStream(destFile).use { outputStream ->
-                        rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
-                    }
-                    
-                    // Recycle bitmaps
-                    if (rotatedBitmap != bitmap) {
-                        rotatedBitmap.recycle()
-                    }
-                    bitmap.recycle()
-                    
-                    // Delete temp file
-                    tempFile.delete()
-                    return
                 }
             }
             
@@ -576,6 +604,18 @@ class ProjectViewModel @Inject constructor(
             tempFile.copyTo(destFile, overwrite = true)
             tempFile.delete()
             
+        } catch (oom: OutOfMemoryError) {
+            android.util.Log.e("ProjectViewModel", "Out of memory processing photo", oom)
+            // Fallback: just copy the file as-is
+            try {
+                context.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
+                    FileOutputStream(destFile).use { outputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("ProjectViewModel", "Fallback copy also failed", e)
+            }
         } catch (e: Exception) {
             android.util.Log.e("ProjectViewModel", "Error handling photo orientation", e)
             // Fallback: just copy the file as-is

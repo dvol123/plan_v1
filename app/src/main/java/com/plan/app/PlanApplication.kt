@@ -25,8 +25,42 @@ class PlanApplication : Application() {
     
     override fun onCreate() {
         super.onCreate()
+        
+        // Set up global uncaught exception handler for better crash logging
+        setupUncaughtExceptionHandler()
+        
         cleanOldCacheFiles()
         prepopulateStates()
+    }
+    
+    /**
+     * Global uncaught exception handler to catch and log unexpected crashes.
+     * This helps identify the root cause of InputDispatcher errors.
+     */
+    private fun setupUncaughtExceptionHandler() {
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            // Log the crash with full stack trace
+            android.util.Log.e(
+                "PlanApp",
+                "Uncaught exception in thread ${thread.name}",
+                throwable
+            )
+            
+            // Also log the cause if present
+            var cause = throwable.cause
+            while (cause != null) {
+                android.util.Log.e(
+                    "PlanApp",
+                    "Caused by: ${cause.javaClass.simpleName}: ${cause.message}"
+                )
+                cause = cause.cause
+            }
+            
+            // Call the default handler to show the crash dialog
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
     }
     
     /**

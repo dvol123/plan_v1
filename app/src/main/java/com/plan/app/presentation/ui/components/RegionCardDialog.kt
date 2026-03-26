@@ -836,18 +836,31 @@ private fun FullscreenMediaViewer(
     val lifecycleOwner = LocalLifecycleOwner.current
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
     
+    // Safe release function for ExoPlayer
+    fun safeReleasePlayer() {
+        try {
+            exoPlayer?.let { player ->
+                player.stop()
+                player.release()
+            }
+            exoPlayer = null
+        } catch (e: Exception) {
+            android.util.Log.e("FullscreenMediaViewer", "Error releasing ExoPlayer", e)
+        }
+    }
+    
     // Lifecycle awareness for ExoPlayer - pause when app goes to background
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> {
-                    exoPlayer?.pause()
+                    try { exoPlayer?.pause() } catch (_: Exception) {}
                 }
                 Lifecycle.Event.ON_RESUME -> {
                     // Don't auto-resume, let user control playback
                 }
                 Lifecycle.Event.ON_STOP -> {
-                    exoPlayer?.pause()
+                    try { exoPlayer?.pause() } catch (_: Exception) {}
                 }
                 else -> {}
             }
@@ -855,6 +868,7 @@ private fun FullscreenMediaViewer(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            safeReleasePlayer()
         }
     }
     
@@ -901,21 +915,21 @@ private fun FullscreenMediaViewer(
                     )
                 }
                 ContentType.VIDEO -> {
-                    // Initialize ExoPlayer
+                    // Initialize ExoPlayer safely
                     LaunchedEffect(content.data) {
-                        exoPlayer?.release()
-                        exoPlayer = ExoPlayer.Builder(context).build().apply {
-                            val mediaItem = androidx.media3.common.MediaItem.fromUri(content.data)
-                            setMediaItem(mediaItem)
-                            prepare()
-                            playWhenReady = true
-                        }
-                    }
-                    
-                    // Cleanup when dialog is dismissed
-                    DisposableEffect(Unit) {
-                        onDispose {
-                            exoPlayer?.release()
+                        // Release previous player safely
+                        safeReleasePlayer()
+                        
+                        // Create new player with error handling
+                        try {
+                            exoPlayer = ExoPlayer.Builder(context).build().apply {
+                                val mediaItem = androidx.media3.common.MediaItem.fromUri(content.data)
+                                setMediaItem(mediaItem)
+                                prepare()
+                                playWhenReady = true
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("FullscreenMediaViewer", "Error creating ExoPlayer", e)
                             exoPlayer = null
                         }
                     }

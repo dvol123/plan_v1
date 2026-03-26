@@ -110,13 +110,20 @@ fun ProjectScreen(
     ) { uri ->
         uri?.let {
             val tempFile = File(context.cacheDir, "temp_export_html.zip")
-            viewModel.exportProjectForPC(tempFile) { success, _ ->
+            viewModel.exportProjectForPC(tempFile) { success, error ->
                 if (success) {
-                    context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                        tempFile.inputStream().use { input ->
-                            input.copyTo(outputStream)
+                    try {
+                        context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                            tempFile.inputStream().use { input ->
+                                input.copyTo(outputStream)
+                            }
                         }
+                    } catch (e: Exception) {
+                        android.util.Log.e("ProjectScreen", "Error writing export file", e)
+                        Toast.makeText(context, context.getString(R.string.export_error), Toast.LENGTH_SHORT).show()
                     }
+                } else {
+                    Toast.makeText(context, error ?: context.getString(R.string.export_error), Toast.LENGTH_SHORT).show()
                 }
                 tempFile.delete()
             }
@@ -129,25 +136,32 @@ fun ProjectScreen(
     ) { uri ->
         uri?.let {
             val tempFile = File(context.cacheDir, "temp_share.zip")
-            viewModel.exportProjectToZip(tempFile) { success, _ ->
+            viewModel.exportProjectToZip(tempFile) { success, error ->
                 if (success) {
-                    context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                        tempFile.inputStream().use { input ->
-                            input.copyTo(outputStream)
+                    try {
+                        context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                            tempFile.inputStream().use { input ->
+                                input.copyTo(outputStream)
+                            }
                         }
+                        // Share the file
+                        val shareUri = androidx.core.content.FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            tempFile
+                        )
+                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "application/zip"
+                            putExtra(android.content.Intent.EXTRA_STREAM, shareUri)
+                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share)))
+                    } catch (e: Exception) {
+                        android.util.Log.e("ProjectScreen", "Error sharing file", e)
+                        Toast.makeText(context, context.getString(R.string.export_error), Toast.LENGTH_SHORT).show()
                     }
-                    // Share the file
-                    val shareUri = androidx.core.content.FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        tempFile
-                    )
-                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                        type = "application/zip"
-                        putExtra(android.content.Intent.EXTRA_STREAM, shareUri)
-                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share)))
+                } else {
+                    Toast.makeText(context, error ?: context.getString(R.string.export_error), Toast.LENGTH_SHORT).show()
                 }
                 tempFile.delete()
             }
