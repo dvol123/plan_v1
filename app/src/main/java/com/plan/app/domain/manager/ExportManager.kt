@@ -191,8 +191,8 @@ class ExportManager @Inject constructor(
                     }
                 }
                 
-                val htmlContent = generateHtmlReport(project, regions, states)
-                File(outputDir, "report.html").writeText(htmlContent)
+                // Collect content data for each region
+                val regionContentsMap = mutableMapOf<Long, List<ContentExportInfo>>()
                 
                 for (region in regions) {
                     val safeName = region.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
@@ -200,7 +200,12 @@ class ExportManager @Inject constructor(
                     regionDir.mkdirs()
                     
                     val contents = contentRepository.getContentsByRegionOnce(region.id)
-                    for ((index, content) in contents.withIndex()) {
+                    val contentInfos = mutableListOf<ContentExportInfo>()
+                    
+                    var photoIndex = 0
+                    var videoIndex = 0
+                    
+                    for (content in contents) {
                         when (content.type) {
                             ContentType.TEXT -> {
                                 File(regionDir, "comment.txt").writeText(content.data)
@@ -208,18 +213,29 @@ class ExportManager @Inject constructor(
                             ContentType.PHOTO -> {
                                 val sourceFile = getFileFromUri(content.data)
                                 if (sourceFile != null && sourceFile.exists()) {
-                                    sourceFile.copyTo(File(regionDir, "photo_$index.jpg"), overwrite = true)
+                                    val fileName = "photo_$photoIndex.jpg"
+                                    sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
+                                    contentInfos.add(ContentExportInfo("photo", "$safeName/$fileName"))
+                                    photoIndex++
                                 }
                             }
                             ContentType.VIDEO -> {
                                 val sourceFile = getFileFromUri(content.data)
                                 if (sourceFile != null && sourceFile.exists()) {
-                                    sourceFile.copyTo(File(regionDir, "video_$index.mp4"), overwrite = true)
+                                    val fileName = "video_$videoIndex.mp4"
+                                    sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
+                                    contentInfos.add(ContentExportInfo("video", "$safeName/$fileName"))
+                                    videoIndex++
                                 }
                             }
                         }
                     }
+                    
+                    regionContentsMap[region.id] = contentInfos
                 }
+                
+                val htmlContent = generateHtmlReportWithContents(project, regions, states, regionContentsMap)
+                File(outputDir, "report.html").writeText(htmlContent)
                 
                 true
             } catch (e: Exception) {
