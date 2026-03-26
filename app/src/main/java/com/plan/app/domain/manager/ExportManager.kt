@@ -1246,31 +1246,110 @@ class ExportManager @Inject constructor(
         }
     }
     
-    private data class ContentExportInfo(
-        val type: String,
-        val path: String
-    )
-    
     /**
-     * Export all projects as HTML reports in a single ZIP file (for viewing on PC).
+     * Export all projects as a single HTML report in one ZIP file (for viewing on PC).
      */
     suspend fun exportAllProjectsForPC(outputFile: File): ZipExportResult {
         return withContext(Dispatchers.IO) {
             try {
-                val projects = projectRepository.getAllProjectsOnce()
+                val tempDir = File(context.cacheDir, "export_all_${System.currentTimeMillis()}")
+                tempDir.mkdirs()
                 
-                ZipOutputStream(java.io.BufferedOutputStream(java.io.FileOutputStream(outputFile))).use { zip ->
-                    for (project in projects) {
-                        val projectZipFile = File.createTempFile("project_pc_", ".zip", context.cacheDir)
-                        val result = exportForPCToZip(project, projectZipFile)
+                val projects = projectRepository.getAllProjectsOnce()
+                val states = stateRepository.getAllStatesOnce()
+                
+                // Collect all data
+                val allProjectsData = mutableListOf<AllProjectData>()
+                
+                for (project in projects) {
+                    val regions = regionRepository.getRegionsByProjectOnce(project.id)
+                    val regionContentsMap = mutableMapOf<Long, List<ContentExportInfo>>()
+                    
+                    // Create photo with areas
+                    val photoFile = getFileFromUri(project.photoUri)
+                    var photoPath: String? = null
+                    if (photoFile != null && photoFile.exists()) {
+                        val bitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
+                        if (bitmap != null) {
+                            val photoWithAreas = drawRegionsOnBitmap(bitmap, regions, states, project.cellSize)
+                            val safeProjectName = project.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
+                            photoPath = "photos/${safeProjectName}_${project.id}.jpg"
+                            File(tempDir, photoPath).apply {
+                                parentFile?.mkdirs()
+                                writeBytes(compressBitmap(photoWithAreas, Bitmap.CompressFormat.JPEG, 90))
+                            }
+                            bitmap.recycle()
+                            photoWithAreas.recycle()
+                        }
+                    }
+                    
+                    // Copy media files for each region
+                    for (region in regions) {
+                        val safeProjectName = project.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
+                        val safeRegionName = region.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
+                        val regionFolder = "media/${safeProjectName}/${safeRegionName}"
+                        val regionDir = File(tempDir, regionFolder)
+                        regionDir.mkdirs()
                         
-                        if (result.success) {
-                            val safeName = project.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
-                            addFileToZip(zip, "projects/${safeName}_${project.id}.zip", projectZipFile)
-                            projectZipFile.delete()
+                        val contents = contentRepository.getContentsByRegionOnce(region.id)
+                        val contentInfos = mutableListOf<ContentExportInfo>()
+                        
+                        var photoIndex = 0
+                        var videoIndex = 0
+                        
+                        for (content in contents) {
+                            when (content.type) {
+                                ContentType.TEXT -> {
+                                    File(regionDir, "comment.txt").writeText(content.data)
+                                }
+                                ContentType.PHOTO -> {
+                                    val sourceFile = getFileFromUri(content.data)
+                                    if (sourceFile != null && sourceFile.exists()) {
+                                        val fileName = "photo_$photoIndex.jpg"
+                                        sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
+                                        contentInfos.add(ContentExportInfo("photo", "$regionFolder/$fileName"))
+                                        photoIndex++
+                                    }
+                                }
+                                ContentType.VIDEO -> {
+                                    val sourceFile = getFileFromUri(content.data)
+                                    if (sourceFile != null && sourceFile.exists()) {
+                                        val fileName = "video_$videoIndex.mp4"
+                                        sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
+                                        contentInfos.add(ContentExportInfo("video", "$regionFolder/$fileName"))
+                                        videoIndex++
+                                    }
+                                }
+                            }
+                        }
+                        
+                        regionContentsMap[region.id] = contentInfos
+                    }
+                    
+                    allProjectsData.add(AllProjectData(
+                        project = project,
+                        regions = regions,
+                        photoPath = photoPath,
+                        regionContentsMap = regionContentsMap
+                    ))
+                }
+                
+                // Generate single HTML with all projects
+                val htmlContent = generateHtmlReportForAllProjects(allProjectsData, states)
+                File(tempDir, "report.html").writeText(htmlContent)
+                
+                // Pack everything into ZIP
+                ZipOutputStream(java.io.BufferedOutputStream(java.io.FileOutputStream(outputFile))).use { zip ->
+                    tempDir.walkTopDown().forEach { file ->
+                        if (file.isFile) {
+                            val relativePath = file.relativeTo(tempDir).path.replace("\\", "/")
+                            addFileToZip(zip, relativePath, file)
                         }
                     }
                 }
+                
+                // Cleanup temp directory
+                tempDir.deleteRecursively()
                 
                 ZipExportResult(success = true, file = outputFile)
             } catch (e: Exception) {
@@ -1278,5 +1357,454 @@ class ExportManager @Inject constructor(
                 ZipExportResult(success = false, error = e.message)
             }
         }
+    }
+    
+    private data class AllProjectData(
+        val project: Project,
+        val regions: List<Region>,
+        val photoPath: String?,
+        val regionContentsMap: Map<Long, List<ContentExportInfo>>
+    )
+    
+    private data class ContentExportInfo(
+        val type: String,
+        val path: String
+    )
+    
+    private fun generateHtmlReportForAllProjects(
+        allProjectsData: List<AllProjectData>,
+        states: List<State>
+    ): String {
+        val builder = StringBuilder()
+        builder.append("<!DOCTYPE html>")
+        builder.append("<html lang='en'>")
+        builder.append("<head>")
+        builder.append("<meta charset='UTF-8'>")
+        builder.append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
+        builder.append("<meta http-equiv='X-UA-Compatible' content='IE=edge'>")
+        builder.append("<title>All Projects</title>")
+        builder.append("<style>")
+        // Reset and base styles
+        builder.append("*{box-sizing:border-box;margin:0;padding:0;}")
+        builder.append("html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;background:#f0f2f5;color:#333;}")
+        // Main container with search
+        builder.append(".main-wrapper{display:flex;flex-direction:column;height:100vh;}")
+        // Search bar
+        builder.append(".search-bar{padding:12px 16px;background:#fff;border-bottom:1px solid #ddd;display:flex;align-items:center;gap:12px;flex-shrink:0;}")
+        builder.append(".search-input{flex:1;padding:10px 16px;border:2px solid #e0e0e0;border-radius:8px;font-size:14px;transition:border-color 0.2s;}")
+        builder.append(".search-input:focus{outline:none;border-color:#1976d2;}")
+        builder.append(".search-results{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-height:300px;overflow:auto;z-index:1000;display:none;margin-top:4px;}")
+        builder.append(".search-results.active{display:block;}")
+        builder.append(".search-result-item{padding:10px 16px;cursor:pointer;border-bottom:1px solid #eee;display:flex;align-items:center;gap:10px;}")
+        builder.append(".search-result-item:last-child{border-bottom:none;}")
+        builder.append(".search-result-item:hover{background:#e3f2fd;}")
+        builder.append(".search-result-type{font-size:10px;padding:2px 6px;border-radius:4px;text-transform:uppercase;font-weight:600;}")
+        builder.append(".search-result-type.project{background:#e8f5e9;color:#2e7d32;}")
+        builder.append(".search-result-type.region{background:#fff3e0;color:#ef6c00;}")
+        builder.append(".search-result-name{flex:1;font-weight:500;}")
+        builder.append(".search-result-parent{color:#888;font-size:12px;}")
+        builder.append(".search-wrapper{position:relative;flex:1;}")
+        // Main container
+        builder.append(".container{display:flex;flex:1;overflow:hidden;}")
+        // Left column (1/3 width)
+        builder.append(".left-column{width:33.333%;min-width:250px;max-width:50%;display:flex;flex-direction:column;border-right:1px solid #ddd;background:#fff;overflow:hidden;}")
+        // Right column (2/3 width)
+        builder.append(".right-column{flex:1;display:flex;flex-direction:column;background:#fafafa;min-width:300px;}")
+        // Panel styles
+        builder.append(".panel{display:flex;flex-direction:column;overflow:hidden;}")
+        builder.append(".panel-header{padding:12px 16px;background:#1976d2;color:#fff;font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}")
+        builder.append(".panel-header.light{background:#f5f5f5;color:#333;border-bottom:1px solid #ddd;}")
+        builder.append(".panel-content{flex:1;overflow:auto;padding:16px;}")
+        // Tree panel (Part 1)
+        builder.append(".tree-panel{flex:0 0 50%;min-height:150px;border-bottom:1px solid #ddd;}")
+        builder.append(".tree-panel .panel-content{padding:8px;}")
+        // Info panel (Part 2)
+        builder.append(".info-panel{flex:1;min-height:150px;}")
+        // Media panel (Part 3)
+        builder.append(".media-panel{flex:1;}")
+        // Tree styles
+        builder.append(".tree-item{padding:6px 8px;cursor:pointer;border-radius:4px;margin:2px 0;display:flex;align-items:center;gap:8px;transition:background 0.2s;user-select:none;}")
+        builder.append(".tree-item:hover{background:#e3f2fd;}")
+        builder.append(".tree-item.active{background:#bbdefb;font-weight:500;}")
+        builder.append(".tree-item.project{font-weight:600;color:#1976d2;padding-left:12px;}")
+        builder.append(".tree-item.region{padding-left:32px;color:#555;}")
+        builder.append(".tree-icon{width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:12px;}")
+        builder.append(".tree-children{margin-left:8px;}")
+        builder.append(".tree-children.collapsed{display:none;}")
+        // Color indicator
+        builder.append(".color-indicator{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,0.2);flex-shrink:0;}")
+        // Info panel styles
+        builder.append(".info-section{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #eee;}")
+        builder.append(".info-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}")
+        builder.append(".info-label{font-weight:600;color:#666;font-size:12px;text-transform:uppercase;margin-bottom:4px;}")
+        builder.append(".info-value{color:#333;line-height:1.5;word-wrap:break-word;}")
+        // Media panel styles
+        builder.append(".media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;}")
+        builder.append(".media-item{background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);transition:transform 0.2s,box-shadow 0.2s;cursor:pointer;}")
+        builder.append(".media-item:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.15);}")
+        builder.append(".media-item img,.media-item video{width:100%;height:150px;object-fit:cover;background:#eee;display:block;}")
+        builder.append(".media-item .media-caption{padding:8px 12px;font-size:12px;color:#666;}")
+        builder.append(".media-item .media-type{display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;text-transform:uppercase;font-weight:600;}")
+        builder.append(".media-type.photo{background:#e8f5e9;color:#2e7d32;}")
+        builder.append(".media-type.video{background:#fff3e0;color:#ef6c00;}")
+        // Media viewer
+        builder.append(".media-viewer{display:none;flex-direction:column;height:100%;background:#1a1a1a;}")
+        builder.append(".media-viewer.active{display:flex;}")
+        builder.append(".viewer-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#2a2a2a;color:#fff;flex-shrink:0;}")
+        builder.append(".viewer-title{font-weight:500;font-size:14px;}")
+        builder.append(".viewer-nav{display:flex;gap:8px;}")
+        builder.append(".viewer-btn{background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;transition:background 0.2s;display:flex;align-items:center;gap:6px;}")
+        builder.append(".viewer-btn:hover{background:rgba(255,255,255,0.2);}")
+        builder.append(".viewer-btn:disabled{opacity:0.5;cursor:not-allowed;}")
+        builder.append(".viewer-content{flex:1;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;}")
+        builder.append(".viewer-content img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;}")
+        builder.append(".viewer-content video{max-width:100%;max-height:100%;border-radius:4px;}")
+        builder.append(".viewer-footer{display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 16px;background:#2a2a2a;flex-shrink:0;}")
+        builder.append(".viewer-counter{color:#aaa;font-size:13px;}")
+        // Empty state
+        builder.append(".empty-state{text-align:center;padding:40px 20px;color:#999;}")
+        builder.append(".empty-state-icon{font-size:48px;margin-bottom:16px;opacity:0.5;}")
+        // Resizer
+        builder.append(".resizer{width:5px;background:#e0e0e0;cursor:col-resize;transition:background 0.2s;flex-shrink:0;}")
+        builder.append(".resizer:hover,.resizer.active{background:#1976d2;}")
+        // Horizontal resizer
+        builder.append(".h-resizer{height:5px;background:#e0e0e0;cursor:row-resize;transition:background 0.2s;flex-shrink:0;}")
+        builder.append(".h-resizer:hover,.h-resizer.active{background:#1976d2;}")
+        // Project info header
+        builder.append(".project-header{background:linear-gradient(135deg,#1976d2,#1565c0);color:#fff;padding:16px;border-radius:8px;margin-bottom:12px;}")
+        builder.append(".project-header h1{font-size:18px;margin-bottom:4px;}")
+        builder.append(".project-header .meta{font-size:12px;opacity:0.9;}")
+        // Photo link
+        builder.append(".photo-link{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#e3f2fd;color:#1976d2;border-radius:6px;text-decoration:none;font-size:13px;margin-top:12px;transition:background 0.2s;cursor:pointer;}")
+        builder.append(".photo-link:hover{background:#bbdefb;}")
+        // Scrollbar styling
+        builder.append(".panel-content{scrollbar-width:thin;scrollbar-color:#ccc #f1f1f1;}")
+        builder.append(".panel-content::-webkit-scrollbar{width:8px;height:8px;}")
+        builder.append(".panel-content::-webkit-scrollbar-track{background:#f1f1f1;border-radius:4px;}")
+        builder.append(".panel-content::-webkit-scrollbar-thumb{background:#ccc;border-radius:4px;}")
+        // Footer
+        builder.append(".footer{padding:12px 16px;background:#f5f5f5;border-top:1px solid #ddd;font-size:11px;color:#888;text-align:center;flex-shrink:0;}")
+        // Region badge
+        builder.append(".region-badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;background:#e0e0e0;color:#666;margin-left:auto;}")
+        builder.append("</style>")
+        builder.append("</head>")
+        builder.append("<body>")
+        builder.append("<div class='main-wrapper'>")
+        // Search bar
+        builder.append("<div class='search-bar'>")
+        builder.append("<div class='search-wrapper'>")
+        builder.append("<input type='text' class='search-input' id='searchInput' placeholder='Search by project name, region name, or types...' autocomplete='off'>")
+        builder.append("<div class='search-results' id='searchResults'></div>")
+        builder.append("</div>")
+        builder.append("</div>")
+        // Main container
+        builder.append("<div class='container'>")
+        // Left column
+        builder.append("<div class='left-column' id='leftColumn'>")
+        // Part 1: Tree panel
+        builder.append("<div class='panel tree-panel' id='treePanel'>")
+        builder.append("<div class='panel-header light'><span>Projects & Regions</span><span id='totalCount'>0 items</span></div>")
+        builder.append("<div class='panel-content' id='treeContent'>")
+        // Tree structure
+        for ((projectIndex, projectData) in allProjectsData.withIndex()) {
+            val project = projectData.project
+            val regions = projectData.regions
+            val totalContentCount = regions.sumOf { projectData.regionContentsMap[it.id]?.size ?: 0 }
+            builder.append("<div class='tree-item project' data-project-id='${project.id}' data-project-index='$projectIndex' onclick='selectProject($projectIndex)'>")
+            builder.append("<span class='tree-icon'>📁</span>")
+            builder.append("<span style='flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>${escapeHtml(project.name)}</span>")
+            if (regions.isNotEmpty()) {
+                builder.append("<span class='region-badge'>${regions.size}</span>")
+            }
+            builder.append("</div>")
+            builder.append("<div class='tree-children' id='project_${projectIndex}_regions'>")
+            for ((regionIndex, region) in regions.withIndex()) {
+                val state = region.stateId?.let { stateId -> states.find { it.id == stateId } }
+                val colorHex = if (state != null) "#${Integer.toHexString(state.color).substring(2).uppercase()}" else "#9e9e9e"
+                val contentCount = projectData.regionContentsMap[region.id]?.size ?: 0
+                builder.append("<div class='tree-item region' data-region-id='${region.id}' data-project-index='$projectIndex' data-region-index='$regionIndex' onclick='selectRegion($projectIndex,$regionIndex)'>")
+                builder.append("<span class='color-indicator' style='background-color:$colorHex;'></span>")
+                builder.append("<span style='flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>${escapeHtml(region.name)}</span>")
+                if (contentCount > 0) {
+                    builder.append("<span class='region-badge'>$contentCount</span>")
+                }
+                builder.append("</div>")
+            }
+            builder.append("</div>")
+        }
+        builder.append("</div>")
+        builder.append("</div>")
+        builder.append("</div>")
+        // Horizontal resizer
+        builder.append("<div class='h-resizer' id='hResizer'></div>")
+        // Part 2: Info panel
+        builder.append("<div class='panel info-panel' id='infoPanel'>")
+        builder.append("<div class='panel-header light'>Details</div>")
+        builder.append("<div class='panel-content' id='infoContent'>")
+        builder.append("<div class='empty-state'><div class='empty-state-icon'>📋</div><div>Select a project or region to view details</div></div>")
+        builder.append("</div>")
+        builder.append("</div>")
+        builder.append("</div>")
+        // Vertical resizer
+        builder.append("<div class='resizer' id='vResizer'></div>")
+        // Right column (Part 3: Media panel)
+        builder.append("<div class='right-column'>")
+        builder.append("<div class='panel media-panel'>")
+        builder.append("<div class='panel-header'><span>Media Content</span><span id='mediaCount'>0 items</span></div>")
+        builder.append("<div class='panel-content' id='mediaContent'>")
+        builder.append("<div class='empty-state'><div class='empty-state-icon'>📷</div><div>Select a region to view media content</div></div>")
+        builder.append("</div>")
+        // Media viewer
+        builder.append("<div class='media-viewer' id='mediaViewer'>")
+        builder.append("<div class='viewer-header'>")
+        builder.append("<span class='viewer-title' id='viewerTitle'>Photo</span>")
+        builder.append("<div class='viewer-nav'>")
+        builder.append("<button class='viewer-btn' id='btnPrev' onclick='navigateMedia(-1)'>◀ Prev</button>")
+        builder.append("<button class='viewer-btn' id='btnNext' onclick='navigateMedia(1)'>Next ▶</button>")
+        builder.append("<button class='viewer-btn' onclick='closeViewer()'>✕ Back to Grid</button>")
+        builder.append("</div>")
+        builder.append("</div>")
+        builder.append("<div class='viewer-content' id='viewerContent'></div>")
+        builder.append("<div class='viewer-footer'>")
+        builder.append("<span class='viewer-counter' id='viewerCounter'>1 / 1</span>")
+        builder.append("</div>")
+        builder.append("</div>")
+        builder.append("</div>")
+        builder.append("<div class='footer'>Generated on ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())} • ${allProjectsData.size} projects</div>")
+        builder.append("</div>")
+        builder.append("</div>")
+        builder.append("</div>")
+        // JavaScript
+        builder.append("<script>")
+        // Projects data
+        builder.append("const projectsData = [")
+        for ((projectIndex, projectData) in allProjectsData.withIndex()) {
+            val project = projectData.project
+            val regions = projectData.regions
+            builder.append("{")
+            builder.append("id:${project.id},")
+            builder.append("name:'${escapeJs(project.name)}',")
+            builder.append("type1:'${escapeJs(project.type1 ?: "")}',")
+            builder.append("type2:'${escapeJs(project.type2 ?: "")}',")
+            builder.append("description:'${escapeJs(project.description ?: "")}',")
+            builder.append("note:'${escapeJs(project.note ?: "")}',")
+            builder.append("photoPath:'${escapeJs(projectData.photoPath ?: "")}',")
+            builder.append("regions:[")
+            for ((regionIndex, region) in regions.withIndex()) {
+                val state = region.stateId?.let { stateId -> states.find { it.id == stateId } }
+                val colorHex = if (state != null) "#${Integer.toHexString(state.color).substring(2).uppercase()}" else "#9e9e9e"
+                builder.append("{")
+                builder.append("id:${region.id},")
+                builder.append("name:'${escapeJs(region.name)}',")
+                builder.append("stateName:'${escapeJs(state?.name ?: "N/A")}',")
+                builder.append("stateColor:'$colorHex',")
+                builder.append("type1:'${escapeJs(region.type1 ?: "")}',")
+                builder.append("type2:'${escapeJs(region.type2 ?: "")}',")
+                builder.append("description:'${escapeJs(region.description ?: "")}',")
+                builder.append("note:'${escapeJs(region.note ?: "")}',")
+                builder.append("contents:[")
+                val contents = projectData.regionContentsMap[region.id] ?: emptyList()
+                for (content in contents) {
+                    builder.append("{type:'${content.type}',path:'${content.path}'},")
+                }
+                builder.append("]")
+                builder.append("},")
+            }
+            builder.append("]")
+            builder.append("},")
+        }
+        builder.append("];")
+        // State
+        builder.append("let currentProjectIndex=-1;")
+        builder.append("let currentRegionIndex=-1;")
+        builder.append("let currentMediaIndex=0;")
+        builder.append("let currentMediaList=[];")
+        // Update total count
+        builder.append("(function(){")
+        builder.append("let total=0;")
+        builder.append("projectsData.forEach(p=>total+=p.regions.length+1);")
+        builder.append("document.getElementById('totalCount').textContent=total+' items';")
+        builder.append("})();")
+        // Search functionality
+        builder.append("const searchInput=document.getElementById('searchInput');")
+        builder.append("const searchResults=document.getElementById('searchResults');")
+        builder.append("searchInput.addEventListener('input',function(e){")
+        builder.append("const query=e.target.value.toLowerCase().trim();")
+        builder.append("if(query.length<2){searchResults.classList.remove('active');return;}")
+        builder.append("const results=[];")
+        builder.append("projectsData.forEach(function(project,pi){")
+        builder.append("if(project.name.toLowerCase().includes(query)||project.type1.toLowerCase().includes(query)||project.type2.toLowerCase().includes(query)){")
+        builder.append("results.push({type:'project',name:project.name,projectIndex:pi,regionIndex:-1});")
+        builder.append("}")
+        builder.append("project.regions.forEach(function(region,ri){")
+        builder.append("if(region.name.toLowerCase().includes(query)||region.type1.toLowerCase().includes(query)||region.type2.toLowerCase().includes(query)){")
+        builder.append("results.push({type:'region',name:region.name,projectIndex:pi,regionIndex:ri,parent:project.name});")
+        builder.append("}")
+        builder.append("});")
+        builder.append("});")
+        builder.append("if(results.length===0){")
+        builder.append("searchResults.innerHTML='<div class=\\'search-result-item\\' style=\\'color:#999;\\'>No results found</div>';")
+        builder.append("}else{")
+        builder.append("let html='';")
+        builder.append("results.slice(0,10).forEach(function(r){")
+        builder.append("html+='<div class=\\'search-result-item\\' onclick=\\'selectSearchResult('+r.projectIndex+','+r.regionIndex+')\\'>';")
+        builder.append("html+='<span class=\\'search-result-type '+r.type+'\\'>'+r.type+'</span>';")
+        builder.append("html+='<span class=\\'search-result-name\\'>'+r.name+'</span>';")
+        builder.append("if(r.parent)html+='<span class=\\'search-result-parent\\'>'+r.parent+'</span>';")
+        builder.append("html+='</div>';")
+        builder.append("});")
+        builder.append("searchResults.innerHTML=html;")
+        builder.append("}")
+        builder.append("searchResults.classList.add('active');")
+        builder.append("});")
+        builder.append("document.addEventListener('click',function(e){")
+        builder.append("if(!searchInput.contains(e.target)&&!searchResults.contains(e.target)){")
+        builder.append("searchResults.classList.remove('active');")
+        builder.append("}")
+        builder.append("});")
+        builder.append("function selectSearchResult(projectIndex,regionIndex){")
+        builder.append("searchResults.classList.remove('active');")
+        builder.append("searchInput.value='';")
+        builder.append("if(regionIndex>=0){")
+        builder.append("selectRegion(projectIndex,regionIndex);")
+        builder.append("}else{")
+        builder.append("selectProject(projectIndex);")
+        builder.append("}")
+        builder.append("}")
+        // Select project
+        builder.append("function selectProject(index){")
+        builder.append("currentProjectIndex=index;")
+        builder.append("currentRegionIndex=-1;")
+        builder.append("closeViewer();")
+        builder.append("document.querySelectorAll('.tree-item').forEach(i=>i.classList.remove('active'));")
+        builder.append("const projectEl=document.querySelector('.tree-item.project[data-project-index=\"'+index+'\"]');")
+        builder.append("if(projectEl){projectEl.classList.add('active');projectEl.scrollIntoView({behavior:'smooth',block:'nearest'});}")
+        builder.append("const p=projectsData[index];")
+        builder.append("if(!p)return;")
+        builder.append("const infoContent=document.getElementById('infoContent');")
+        builder.append("let infoHtml='<div class=\\'project-header\\'><h1>'+p.name+'</h1><div class=\\'meta\\'>'+p.regions.length+' regions</div></div>';")
+        builder.append("if(p.description)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Description</div><div class=\\'info-value\\'>'+p.description+'</div></div>';")
+        builder.append("if(p.type1)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Type 1</div><div class=\\'info-value\\'>'+p.type1+'</div></div>';")
+        builder.append("if(p.type2)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Type 2</div><div class=\\'info-value\\'>'+p.type2+'</div></div>';")
+        builder.append("if(p.note)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Note</div><div class=\\'info-value\\'>'+p.note+'</div></div>';")
+        builder.append("if(p.photoPath)infoHtml+='<span class=\\'photo-link\\' onclick=\\'showProjectPhoto('+index+')\\'>📷 View photo with areas</span>';")
+        builder.append("infoContent.innerHTML=infoHtml;")
+        builder.append("document.getElementById('mediaContent').innerHTML='<div class=\\'empty-state\\'><div class=\\'empty-state-icon\\'>📷</div><div>Select a region to view media content</div></div>';")
+        builder.append("document.getElementById('mediaCount').textContent='0 items';")
+        builder.append("}")
+        // Show project photo
+        builder.append("function showProjectPhoto(index){")
+        builder.append("const p=projectsData[index];")
+        builder.append("if(!p||!p.photoPath)return;")
+        builder.append("currentMediaList=[{type:'photo',path:p.photoPath}];")
+        builder.append("currentMediaIndex=0;")
+        builder.append("openViewer();")
+        builder.append("document.getElementById('viewerTitle').textContent='Photo - '+p.name;")
+        builder.append("}")
+        // Select region
+        builder.append("function selectRegion(projectIndex,regionIndex){")
+        builder.append("currentProjectIndex=projectIndex;")
+        builder.append("currentRegionIndex=regionIndex;")
+        builder.append("closeViewer();")
+        builder.append("document.querySelectorAll('.tree-item').forEach(i=>i.classList.remove('active'));")
+        builder.append("const regionEl=document.querySelector('.tree-item.region[data-project-index=\"'+projectIndex+'\"][data-region-index=\"'+regionIndex+'\"]');")
+        builder.append("if(regionEl){regionEl.classList.add('active');regionEl.scrollIntoView({behavior:'smooth',block:'nearest'});}")
+        builder.append("const p=projectsData[projectIndex];")
+        builder.append("if(!p)return;")
+        builder.append("const r=p.regions[regionIndex];")
+        builder.append("if(!r)return;")
+        builder.append("const infoContent=document.getElementById('infoContent');")
+        builder.append("let infoHtml='<div class=\\'info-section\\'><div class=\\'info-label\\'>Region Name</div><div class=\\'info-value\\' style=\\'font-size:18px;font-weight:600;\\'>'+r.name+'</div></div>';")
+        builder.append("infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Project</div><div class=\\'info-value\\'>'+p.name+'</div></div>';")
+        builder.append("infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>State</div><div class=\\'info-value\\'><span class=\\'color-indicator\\' style=\\'background-color:'+r.stateColor+';margin-right:8px;\\'></span>'+r.stateName+'</div></div>';")
+        builder.append("if(r.type1)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Type 1</div><div class=\\'info-value\\'>'+r.type1+'</div></div>';")
+        builder.append("if(r.type2)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Type 2</div><div class=\\'info-value\\'>'+r.type2+'</div></div>';")
+        builder.append("if(r.description)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Description</div><div class=\\'info-value\\'>'+r.description+'</div></div>';")
+        builder.append("if(r.note)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Note</div><div class=\\'info-value\\'>'+r.note+'</div></div>';")
+        builder.append("infoContent.innerHTML=infoHtml;")
+        builder.append("updateMediaPanel(r);")
+        builder.append("}")
+        // Update media panel
+        builder.append("function updateMediaPanel(region){")
+        builder.append("const mediaContent=document.getElementById('mediaContent');")
+        builder.append("currentMediaList=region.contents||[];")
+        builder.append("document.getElementById('mediaCount').textContent=currentMediaList.length+' item'+(currentMediaList.length!==1?'s':'');")
+        builder.append("if(currentMediaList.length===0){")
+        builder.append("mediaContent.innerHTML='<div class=\\'empty-state\\'><div class=\\'empty-state-icon\\'>📷</div><div>No media content for this region</div></div>';")
+        builder.append("return;")
+        builder.append("}")
+        builder.append("let html='<div class=\\'media-grid\\'>';")
+        builder.append("currentMediaList.forEach(function(item,index){")
+        builder.append("if(item.type==='photo'){")
+        builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><img src=\\''+item.path+'\\' alt=\\'Photo\\' loading=\\'lazy\\'><div class=\\'media-caption\\'><span class=\\'media-type photo\\'>Photo</span></div></div>';")
+        builder.append("}else if(item.type==='video'){")
+        builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><video src=\\''+item.path+'\\' preload=\\'metadata\\' muted></video><div class=\\'media-caption\\'><span class=\\'media-type video\\'>Video</span></div></div>';")
+        builder.append("}")
+        builder.append("});")
+        builder.append("html+='</div>';")
+        builder.append("mediaContent.innerHTML=html;")
+        builder.append("}")
+        // Media viewer functions
+        builder.append("function openMediaItem(index){currentMediaIndex=index;openViewer();}")
+        builder.append("function openViewer(){")
+        builder.append("if(currentMediaList.length===0)return;")
+        builder.append("document.getElementById('mediaContent').style.display='none';")
+        builder.append("document.getElementById('mediaViewer').classList.add('active');")
+        builder.append("updateViewerContent();")
+        builder.append("}")
+        builder.append("function closeViewer(){")
+        builder.append("document.getElementById('mediaViewer').classList.remove('active');")
+        builder.append("document.getElementById('mediaContent').style.display='block';")
+        builder.append("}")
+        builder.append("function updateViewerContent(){")
+        builder.append("if(currentMediaList.length===0)return;")
+        builder.append("const item=currentMediaList[currentMediaIndex];")
+        builder.append("const viewerContent=document.getElementById('viewerContent');")
+        builder.append("const viewerTitle=document.getElementById('viewerTitle');")
+        builder.append("const viewerCounter=document.getElementById('viewerCounter');")
+        builder.append("viewerCounter.textContent=(currentMediaIndex+1)+' / '+currentMediaList.length;")
+        builder.append("const p=projectsData[currentProjectIndex];")
+        builder.append("const r=p&&currentRegionIndex>=0?p.regions[currentRegionIndex]:null;")
+        builder.append("if(item.type==='photo'){")
+        builder.append("viewerContent.innerHTML='<img src=\\''+item.path+'\\' alt=\\'Photo\\'>';")
+        builder.append("viewerTitle.textContent='Photo - '+(r?r.name:p?r.name:'Project');")
+        builder.append("}else if(item.type==='video'){")
+        builder.append("viewerContent.innerHTML='<video controls autoplay><source src=\\''+item.path+'\\' type=\\'video/mp4\\'>Your browser does not support video.</video>';")
+        builder.append("viewerTitle.textContent='Video - '+(r?r.name:p?r.name:'Project');")
+        builder.append("}")
+        builder.append("document.getElementById('btnPrev').disabled=currentMediaIndex===0;")
+        builder.append("document.getElementById('btnNext').disabled=currentMediaIndex===currentMediaList.length-1;")
+        builder.append("}")
+        builder.append("function navigateMedia(direction){")
+        builder.append("const newIndex=currentMediaIndex+direction;")
+        builder.append("if(newIndex>=0&&newIndex<currentMediaList.length){currentMediaIndex=newIndex;updateViewerContent();}")
+        builder.append("}")
+        builder.append("document.addEventListener('keydown',function(e){")
+        builder.append("if(!document.getElementById('mediaViewer').classList.contains('active'))return;")
+        builder.append("if(e.key==='ArrowLeft')navigateMedia(-1);")
+        builder.append("else if(e.key==='ArrowRight')navigateMedia(1);")
+        builder.append("else if(e.key==='Escape')closeViewer();")
+        builder.append("});")
+        // Resizers
+        builder.append("(function(){")
+        builder.append("const resizer=document.getElementById('vResizer');")
+        builder.append("const leftColumn=document.getElementById('leftColumn');")
+        builder.append("let isResizing=false;")
+        builder.append("resizer.addEventListener('mousedown',function(e){isResizing=true;resizer.classList.add('active');document.body.style.cursor='col-resize';document.body.style.userSelect='none';});")
+        builder.append("document.addEventListener('mousemove',function(e){if(!isResizing)return;const containerWidth=document.querySelector('.container').offsetWidth;const newWidth=Math.max(250,Math.min(e.clientX,containerWidth*0.5));leftColumn.style.width=newWidth+'px';});")
+        builder.append("document.addEventListener('mouseup',function(){if(isResizing){isResizing=false;resizer.classList.remove('active');document.body.style.cursor='';document.body.style.userSelect='';}});")
+        builder.append("})();")
+        builder.append("(function(){")
+        builder.append("const resizer=document.getElementById('hResizer');")
+        builder.append("const treePanel=document.getElementById('treePanel');")
+        builder.append("let isResizing=false;")
+        builder.append("resizer.addEventListener('mousedown',function(e){isResizing=true;e.preventDefault();resizer.classList.add('active');document.body.style.cursor='row-resize';document.body.style.userSelect='none';});")
+        builder.append("document.addEventListener('mousemove',function(e){if(!isResizing)return;const containerRect=document.getElementById('leftColumn').getBoundingClientRect();const relY=e.clientY-containerRect.top;const containerHeight=containerRect.height-5;const newHeight=Math.max(100,Math.min(relY,containerHeight-150));treePanel.style.flex='0 0 '+newHeight+'px';});")
+        builder.append("document.addEventListener('mouseup',function(){if(isResizing){isResizing=false;resizer.classList.remove('active');document.body.style.cursor='';document.body.style.userSelect='';}});")
+        builder.append("})();")
+        builder.append("</script>")
+        builder.append("</body>")
+        builder.append("</html>")
+        return builder.toString()
     }
 }
