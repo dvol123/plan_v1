@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -77,10 +78,14 @@ fun RegionCardDialog(
     var selectedColorIndex by remember { mutableStateOf(0) }
     var pendingNewState by remember { mutableStateOf<Pair<String, Int>?>(null) }
     
-    var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
-    var cameraVideoUri by remember { mutableStateOf<Uri?>(null) }
+    var cameraImageUriString by rememberSaveable { mutableStateOf<String?>(null) }
+    var cameraVideoUriString by rememberSaveable { mutableStateOf<String?>(null) }
     var showCameraPermissionDenied by remember { mutableStateOf(false) }
     var pendingMediaType by remember { mutableStateOf<MediaType?>(null) }
+    
+    // Convert saved strings back to URIs
+    val cameraImageUri = cameraImageUriString?.let { Uri.parse(it) }
+    val cameraVideoUri = cameraVideoUriString?.let { Uri.parse(it) }
     
     // Fullscreen media viewer state
     var showFullscreenMedia by remember { mutableStateOf(false) }
@@ -91,21 +96,42 @@ fun RegionCardDialog(
         region.contents.filter { it.type == ContentType.PHOTO || it.type == ContentType.VIDEO }
     }
     
-    // Camera launcher for photos
+    // Camera launcher for photos - check file existence regardless of success flag
     val photoCameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
-        if (success && cameraImageUri != null) {
-            onAddPhoto(cameraImageUri!!)
+        // Check if file exists regardless of success flag
+        // (success may be false on rotation, but file still exists)
+        cameraImageUri?.let { uri ->
+            val fileExists = try {
+                context.contentResolver.openInputStream(uri)?.close()
+                true
+            } catch (e: Exception) {
+                false
+            }
+            if (fileExists) {
+                onAddPhoto(uri)
+                cameraImageUriString = null // Clear after successful add
+            }
         }
     }
     
-    // Camera launcher for videos
+    // Camera launcher for videos - check file existence regardless of success flag
     val videoCameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CaptureVideo()
     ) { success ->
-        if (success && cameraVideoUri != null) {
-            onAddVideo(cameraVideoUri!!)
+        // Check if file exists regardless of success flag
+        cameraVideoUri?.let { uri ->
+            val fileExists = try {
+                context.contentResolver.openInputStream(uri)?.close()
+                true
+            } catch (e: Exception) {
+                false
+            }
+            if (fileExists) {
+                onAddVideo(uri)
+                cameraVideoUriString = null // Clear after successful add
+            }
         }
     }
     
@@ -118,21 +144,23 @@ fun RegionCardDialog(
             when (pendingMediaType) {
                 MediaType.PHOTO -> {
                     val tempFile = File(context.cacheDir, "photo_${System.currentTimeMillis()}.jpg")
-                    cameraImageUri = FileProvider.getUriForFile(
+                    val uri = FileProvider.getUriForFile(
                         context,
                         "${context.packageName}.fileprovider",
                         tempFile
                     )
-                    cameraImageUri?.let { photoCameraLauncher.launch(it) }
+                    cameraImageUriString = uri.toString()
+                    photoCameraLauncher.launch(uri)
                 }
                 MediaType.VIDEO -> {
                     val tempFile = File(context.cacheDir, "video_${System.currentTimeMillis()}.mp4")
-                    cameraVideoUri = FileProvider.getUriForFile(
+                    val uri = FileProvider.getUriForFile(
                         context,
                         "${context.packageName}.fileprovider",
                         tempFile
                     )
-                    cameraVideoUri?.let { videoCameraLauncher.launch(it) }
+                    cameraVideoUriString = uri.toString()
+                    videoCameraLauncher.launch(uri)
                 }
                 null -> {}
             }
@@ -214,12 +242,13 @@ fun RegionCardDialog(
                             when (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)) {
                                 PackageManager.PERMISSION_GRANTED -> {
                                     val tempFile = File(context.cacheDir, "photo_${System.currentTimeMillis()}.jpg")
-                                    cameraImageUri = FileProvider.getUriForFile(
+                                    val uri = FileProvider.getUriForFile(
                                         context,
                                         "${context.packageName}.fileprovider",
                                         tempFile
                                     )
-                                    cameraImageUri?.let { photoCameraLauncher.launch(it) }
+                                    cameraImageUriString = uri.toString()
+                                    photoCameraLauncher.launch(uri)
                                 }
                                 else -> {
                                     cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
@@ -231,12 +260,13 @@ fun RegionCardDialog(
                             when (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)) {
                                 PackageManager.PERMISSION_GRANTED -> {
                                     val tempFile = File(context.cacheDir, "video_${System.currentTimeMillis()}.mp4")
-                                    cameraVideoUri = FileProvider.getUriForFile(
+                                    val uri = FileProvider.getUriForFile(
                                         context,
                                         "${context.packageName}.fileprovider",
                                         tempFile
                                     )
-                                    cameraVideoUri?.let { videoCameraLauncher.launch(it) }
+                                    cameraVideoUriString = uri.toString()
+                                    videoCameraLauncher.launch(uri)
                                 }
                                 else -> {
                                     cameraPermissionLauncher.launch(Manifest.permission.CAMERA)

@@ -260,11 +260,12 @@ fun MainScreen(
                         onValueChange = { viewModel.setSearchQuery(it) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(40.dp),
+                            .heightIn(min = 44.dp),
                         placeholder = { 
                             Text(
                                 stringResource(R.string.search_projects),
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1
                             ) 
                         },
                         leadingIcon = { 
