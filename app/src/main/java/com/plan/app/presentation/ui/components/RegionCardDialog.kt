@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -37,6 +38,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.compose.ui.viewinterop.AndroidView
@@ -112,6 +115,16 @@ fun RegionCardDialog(
             if (fileExists) {
                 onAddPhoto(uri)
                 cameraImageUriString = null // Clear after successful add
+            } else {
+                // Clean up temp file if camera was cancelled
+                try {
+                    val path = uri.path
+                    if (path != null) {
+                        File(path).delete()
+                    }
+                } catch (e: Exception) {
+                    // Ignore cleanup errors
+                }
             }
         }
     }
@@ -131,6 +144,16 @@ fun RegionCardDialog(
             if (fileExists) {
                 onAddVideo(uri)
                 cameraVideoUriString = null // Clear after successful add
+            } else {
+                // Clean up temp file if camera was cancelled
+                try {
+                    val path = uri.path
+                    if (path != null) {
+                        File(path).delete()
+                    }
+                } catch (e: Exception) {
+                    // Ignore cleanup errors
+                }
             }
         }
     }
@@ -810,7 +833,30 @@ private fun FullscreenMediaViewer(
     
     // Video player state
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
+    
+    // Lifecycle awareness for ExoPlayer - pause when app goes to background
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    exoPlayer?.pause()
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    // Don't auto-resume, let user control playback
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    exoPlayer?.pause()
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     
     Dialog(
         onDismissRequest = onDismiss,
@@ -866,7 +912,7 @@ private fun FullscreenMediaViewer(
                         }
                     }
                     
-                    // Cleanup
+                    // Cleanup when dialog is dismissed
                     DisposableEffect(Unit) {
                         onDispose {
                             exoPlayer?.release()

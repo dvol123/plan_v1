@@ -8,6 +8,7 @@ import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 /**
@@ -24,7 +25,48 @@ class PlanApplication : Application() {
     
     override fun onCreate() {
         super.onCreate()
+        cleanOldCacheFiles()
         prepopulateStates()
+    }
+    
+    /**
+     * Clean old temporary files from cache to prevent storage bloat.
+     * This is called on app startup to clean up files from previous sessions.
+     */
+    private fun cleanOldCacheFiles() {
+        applicationScope.launch {
+            try {
+                val cacheDir = this@PlanApplication.cacheDir
+                val now = System.currentTimeMillis()
+                val oneHourMs = 60 * 60 * 1000L
+                
+                // Clean old temporary files (older than 1 hour)
+                cacheDir.listFiles()?.forEach { file ->
+                    if (file.isFile) {
+                        // Delete old temp files
+                        if (file.lastModified() < now - oneHourMs) {
+                            val name = file.name.lowercase()
+                            // Only delete known temp file patterns
+                            if (name.startsWith("temp_") || 
+                                name.startsWith("export_") || 
+                                name.startsWith("import_") ||
+                                name.startsWith("camera_") ||
+                                name.startsWith("photo_") ||
+                                name.startsWith("video_")) {
+                                file.delete()
+                            }
+                        }
+                    } else if (file.isDirectory) {
+                        // Clean export directories
+                        if (file.name.startsWith("export_")) {
+                            file.deleteRecursively()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("PlanApplication", "Error cleaning cache", e)
+            }
+        }
     }
     
     private fun prepopulateStates() {

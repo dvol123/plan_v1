@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Data extraction rules for Android 12+ (API 31+).
+  These rules define what data can be extracted from the app for backup/transfer.
+  Since allowBackup=false, these rules provide additional protection.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Disable cloud backup completely -->
+        <include domain="none" />
+    </cloud-backup>
+    <device-transfer>
+        <!-- Disable device-to-device transfer -->
+        <include domain="none" />
+    </device-transfer>
+</data-extraction-rules>
