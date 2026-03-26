@@ -669,9 +669,11 @@ private fun findTappedRegion(
     val col = (offset.x / cellWidth).toInt()
     val row = (offset.y / cellHeight).toInt()
     
-    return regions.find { region ->
-        region.cells.any { it.row == row && it.col == col }
-    }
+    // Find all regions containing this cell, then return the smallest one
+    // (smallest by number of cells) to allow selecting smaller regions inside larger ones
+    return regions
+        .filter { region -> region.cells.any { it.row == row && it.col == col } }
+        .minByOrNull { it.cells.size }
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGrid(

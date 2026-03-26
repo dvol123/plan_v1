@@ -276,6 +276,7 @@ class ExportManager @Inject constructor(
             
             val color = state?.color ?: Color.GRAY
             fillPaint.color = color
+            fillPaint.alpha = 100 // Semi-transparent (about 40% opacity)
             
             for (cell in region.cells) {
                 val rect = RectF(
@@ -323,7 +324,7 @@ class ExportManager @Inject constructor(
         builder.append(".panel-header.light{background:#f5f5f5;color:#333;border-bottom:1px solid #ddd;}")
         builder.append(".panel-content{flex:1;overflow:auto;padding:16px;}")
         // Tree panel (Part 1)
-        builder.append(".tree-panel{flex:0 0 50%;min-height:150px;border-bottom:1px solid #ddd;}")
+        builder.append(".tree-panel{flex:0 0 auto;min-height:150px;max-height:40%;border-bottom:1px solid #ddd;}")
         builder.append(".tree-panel .panel-content{padding:8px;}")
         // Info panel (Part 2)
         builder.append(".info-panel{flex:1;min-height:150px;}")
@@ -585,7 +586,7 @@ class ExportManager @Inject constructor(
         builder.append(".panel-header.light{background:#f5f5f5;color:#333;border-bottom:1px solid #ddd;}")
         builder.append(".panel-content{flex:1;overflow:auto;padding:16px;}")
         // Tree panel (Part 1)
-        builder.append(".tree-panel{flex:0 0 50%;min-height:150px;border-bottom:1px solid #ddd;}")
+        builder.append(".tree-panel{flex:0 0 auto;min-height:150px;max-height:40%;border-bottom:1px solid #ddd;}")
         builder.append(".tree-panel .panel-content{padding:8px;}")
         // Info panel (Part 2)
         builder.append(".info-panel{flex:1;min-height:150px;}")
@@ -1416,7 +1417,7 @@ class ExportManager @Inject constructor(
         builder.append(".panel-header.light{background:#f5f5f5;color:#333;border-bottom:1px solid #ddd;}")
         builder.append(".panel-content{flex:1;overflow:auto;padding:16px;}")
         // Tree panel (Part 1)
-        builder.append(".tree-panel{flex:0 0 50%;min-height:150px;border-bottom:1px solid #ddd;}")
+        builder.append(".tree-panel{flex:0 0 auto;min-height:150px;max-height:40%;border-bottom:1px solid #ddd;}")
         builder.append(".tree-panel .panel-content{padding:8px;}")
         // Info panel (Part 2)
         builder.append(".info-panel{flex:1;min-height:150px;}")
