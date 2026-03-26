@@ -127,8 +127,17 @@ class ProjectViewModel @Inject constructor(
     
     fun toggleEditMode() {
         val newMode = !_uiState.value.isViewMode
+        val wasInEditMode = !_uiState.value.isViewMode // true if we're exiting edit mode
+        
         _uiState.value = _uiState.value.copy(isViewMode = newMode)
         gridManager.setEditingMode(!newMode)
+        
+        // When exiting edit mode, lock grid controls if cellSize was changed (> 1)
+        // This ensures the grid size can be adjusted during the first editing session
+        // but is locked for subsequent sessions
+        if (wasInEditMode && gridManager.cellSize.value > 1) {
+            _uiState.value = _uiState.value.copy(showGridSizeControls = false)
+        }
     }
     
     fun selectRegion(region: Region?) {
@@ -210,10 +219,9 @@ class ProjectViewModel @Inject constructor(
     
     fun setCellSize(size: Int) {
         gridManager.setCellSize(size)
-        // Hide grid controls after user confirms a size (if size > 1, it means user changed it)
-        if (size > 1) {
-            _uiState.value = _uiState.value.copy(showGridSizeControls = false)
-        }
+        // Note: Grid controls visibility is managed in toggleEditMode()
+        // Controls remain visible during the first editing session to allow adjustments
+        // They get locked only when exiting edit mode (after user confirms their choice)
         viewModelScope.launch {
             _uiState.value.project?.let { project ->
                 manageProjectUseCase.update(project.copy(cellSize = size))
