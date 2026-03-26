@@ -323,11 +323,11 @@ class ExportManager @Inject constructor(
         builder.append(".panel-header{padding:12px 16px;background:#1976d2;color:#fff;font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:space-between;}")
         builder.append(".panel-header.light{background:#f5f5f5;color:#333;border-bottom:1px solid #ddd;}")
         builder.append(".panel-content{flex:1;overflow:auto;padding:16px;}")
-        // Tree panel (Part 1)
-        builder.append(".tree-panel{flex:0 0 auto;min-height:150px;max-height:40%;border-bottom:1px solid #ddd;}")
-        builder.append(".tree-panel .panel-content{padding:8px;}")
-        // Info panel (Part 2)
-        builder.append(".info-panel{flex:1;min-height:150px;}")
+        // Tree panel (Part 1) - initial size 35%, resizable
+        builder.append(".tree-panel{flex:0 0 35%;min-height:100px;max-height:60%;overflow:hidden;}")
+        builder.append(".tree-panel .panel-content{padding:8px;overflow:auto;}")
+        // Info panel (Part 2) - takes remaining space
+        builder.append(".info-panel{flex:1 1 auto;min-height:100px;overflow:hidden;}")
         // Media panel (Part 3)
         builder.append(".media-panel{flex:1;}")
         // Tree styles
@@ -585,11 +585,11 @@ class ExportManager @Inject constructor(
         builder.append(".panel-header{padding:12px 16px;background:#1976d2;color:#fff;font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}")
         builder.append(".panel-header.light{background:#f5f5f5;color:#333;border-bottom:1px solid #ddd;}")
         builder.append(".panel-content{flex:1;overflow:auto;padding:16px;}")
-        // Tree panel (Part 1)
-        builder.append(".tree-panel{flex:0 0 auto;min-height:150px;max-height:40%;border-bottom:1px solid #ddd;}")
-        builder.append(".tree-panel .panel-content{padding:8px;}")
-        // Info panel (Part 2)
-        builder.append(".info-panel{flex:1;min-height:150px;}")
+        // Tree panel (Part 1) - initial size 35%, resizable
+        builder.append(".tree-panel{flex:0 0 35%;min-height:100px;max-height:60%;overflow:hidden;}")
+        builder.append(".tree-panel .panel-content{padding:8px;overflow:auto;}")
+        // Info panel (Part 2) - takes remaining space
+        builder.append(".info-panel{flex:1 1 auto;min-height:100px;overflow:hidden;}")
         // Media panel (Part 3)
         builder.append(".media-panel{flex:1;}")
         // Tree styles
@@ -1416,11 +1416,11 @@ class ExportManager @Inject constructor(
         builder.append(".panel-header{padding:12px 16px;background:#1976d2;color:#fff;font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}")
         builder.append(".panel-header.light{background:#f5f5f5;color:#333;border-bottom:1px solid #ddd;}")
         builder.append(".panel-content{flex:1;overflow:auto;padding:16px;}")
-        // Tree panel (Part 1)
-        builder.append(".tree-panel{flex:0 0 auto;min-height:150px;max-height:40%;border-bottom:1px solid #ddd;}")
-        builder.append(".tree-panel .panel-content{padding:8px;}")
-        // Info panel (Part 2)
-        builder.append(".info-panel{flex:1;min-height:150px;}")
+        // Tree panel (Part 1) - initial size 35%, resizable
+        builder.append(".tree-panel{flex:0 0 35%;min-height:100px;max-height:60%;overflow:hidden;}")
+        builder.append(".tree-panel .panel-content{padding:8px;overflow:auto;}")
+        // Info panel (Part 2) - takes remaining space
+        builder.append(".info-panel{flex:1 1 auto;min-height:100px;overflow:hidden;}")
         // Media panel (Part 3)
         builder.append(".media-panel{flex:1;}")
         // Tree styles
