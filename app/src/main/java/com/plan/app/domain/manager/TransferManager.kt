@@ -1,13 +1,9 @@
 package com.plan.app.domain.manager
 
-import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
-import android.content.pm.PackageManager
 import android.net.wifi.p2p.WifiP2pManager
-import android.os.Build
-import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +13,8 @@ import javax.inject.Singleton
 
 /**
  * Transfer state for Wi-Fi Direct/Bluetooth sharing.
+ * NOTE: This feature is reserved for future implementation.
+ * Current version does not include Wi-Fi Direct/Bluetooth permissions.
  */
 sealed class TransferState {
     object Idle : TransferState()
@@ -29,6 +27,16 @@ sealed class TransferState {
 
 /**
  * Manager for device-to-device transfer (Wi-Fi Direct/Bluetooth).
+ * 
+ * NOTE: This is a placeholder for future functionality.
+ * To enable this feature:
+ * 1. Add required permissions to AndroidManifest.xml:
+ *    - INTERNET
+ *    - ACCESS_WIFI_STATE, CHANGE_WIFI_STATE
+ *    - ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION
+ *    - BLUETOOTH, BLUETOOTH_ADMIN
+ *    - BLUETOOTH_CONNECT, BLUETOOTH_SCAN, BLUETOOTH_ADVERTISE (Android 12+)
+ * 2. Implement the actual transfer logic
  */
 @Singleton
 class TransferManager @Inject constructor(
@@ -45,34 +53,38 @@ class TransferManager @Inject constructor(
     }
     
     private fun initializeManagers() {
-        // Initialize Wi-Fi P2P
-        wifiP2pManager = context.getSystemService(Context.WIFI_P2P_SERVICE) as? WifiP2pManager
-        
-        // Initialize Bluetooth
-        val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
-        bluetoothAdapter = bluetoothManager?.adapter
-    }
-    
-    fun hasWifiDirectPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-    }
-    
-    fun hasBluetoothPermission(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.BLUETOOTH_SCAN
-            ) == PackageManager.PERMISSION_GRANTED &&
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.BLUETOOTH_CONNECT
-            ) == PackageManager.PERMISSION_GRANTED
-        } else {
-            true
+        // Initialize Wi-Fi P2P (will work when permissions are added)
+        try {
+            wifiP2pManager = context.getSystemService(Context.WIFI_P2P_SERVICE) as? WifiP2pManager
+        } catch (e: Exception) {
+            // Wi-Fi P2P not available
         }
+        
+        // Initialize Bluetooth (will work when permissions are added)
+        try {
+            val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            bluetoothAdapter = bluetoothManager?.adapter
+        } catch (e: Exception) {
+            // Bluetooth not available
+        }
+    }
+    
+    /**
+     * Check if Wi-Fi Direct permissions are granted.
+     * Currently returns false as permissions are not included in this version.
+     */
+    fun hasWifiDirectPermission(): Boolean {
+        // Reserved for future use - permissions not included in current version
+        return false
+    }
+    
+    /**
+     * Check if Bluetooth permissions are granted.
+     * Currently returns false as permissions are not included in this version.
+     */
+    fun hasBluetoothPermission(): Boolean {
+        // Reserved for future use - permissions not included in current version
+        return false
     }
     
     fun isWifiDirectSupported(): Boolean {
@@ -87,33 +99,26 @@ class TransferManager @Inject constructor(
         _transferState.value = TransferState.Idle
     }
     
-    // Wi-Fi Direct discovery and transfer methods would be implemented here
-    // These are placeholder methods for the full implementation
+    // Wi-Fi Direct discovery and transfer methods - placeholder implementation
     
     suspend fun startDiscovery() {
-        _transferState.value = TransferState.Discovering("Searching for nearby devices...")
-        // Implement Wi-Fi Direct discovery
+        _transferState.value = TransferState.Error("Transfer feature not available in this version")
     }
     
     suspend fun stopDiscovery() {
         _transferState.value = TransferState.Idle
-        // Stop Wi-Fi Direct discovery
     }
     
     suspend fun connectToDevice(deviceAddress: String) {
-        _transferState.value = TransferState.Connecting(deviceAddress)
-        // Connect to peer device
+        _transferState.value = TransferState.Error("Transfer feature not available in this version")
     }
     
     suspend fun sendFile(file: java.io.File) {
-        _transferState.value = TransferState.Transferring(0)
-        // Send file to connected device
-        // Update progress during transfer
+        _transferState.value = TransferState.Error("Transfer feature not available in this version")
     }
     
     suspend fun receiveFile(): java.io.File? {
-        _transferState.value = TransferState.Transferring(0)
-        // Receive file from connected device
+        _transferState.value = TransferState.Error("Transfer feature not available in this version")
         return null
     }
 }
