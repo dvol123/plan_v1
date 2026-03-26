@@ -63,6 +63,7 @@ data class ProjectUiState(
  * ViewModel for Project Screen.
  */
 @HiltViewModel
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ProjectViewModel @Inject constructor(
     private val manageProjectUseCase: ManageProjectUseCase,
     private val regionRepository: RegionRepository,
