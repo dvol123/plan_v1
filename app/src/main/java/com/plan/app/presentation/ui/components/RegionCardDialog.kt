@@ -281,7 +281,8 @@ fun RegionCardDialog(
                         label = { Text(stringResource(R.string.type1)) },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = isEditing,
-                        singleLine = true
+                        minLines = 2,
+                        maxLines = 4
                     )
                     
                     Spacer(modifier = Modifier.height(8.dp))
@@ -293,7 +294,8 @@ fun RegionCardDialog(
                         label = { Text(stringResource(R.string.type2)) },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = isEditing,
-                        singleLine = true
+                        minLines = 2,
+                        maxLines = 4
                     )
                     
                     Spacer(modifier = Modifier.height(8.dp))

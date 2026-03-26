@@ -394,9 +394,6 @@ fun ProjectScreen(
                                 viewModel.selectRegion(region)
                             }
                         },
-                        onCellDoubleTap = { cell ->
-                            viewModel.onCellDoubleTap(cell)
-                        },
                         onCellSingleTap = { cell ->
                             viewModel.onCellSingleTap(cell)
                         },
@@ -524,7 +521,6 @@ private fun ZoomablePhotoWithOverlay(
     imageSize: IntSize,
     onImageSizeChanged: (IntSize) -> Unit,
     onRegionDoubleTap: (Region) -> Unit,
-    onCellDoubleTap: (Cell) -> Unit,
     onCellSingleTap: (Cell) -> Unit,
     isZoomEnabled: Boolean
 ) {
@@ -593,12 +589,8 @@ private fun ZoomablePhotoWithOverlay(
                 .pointerInput(isEditing, cellSize) {
                     if (isEditing) {
                         detectTapGestures(
-                            onDoubleTap = { offset ->
-                                val cell = positionToCell(offset, cellSize, photoWidth, photoHeight)
-                                onCellDoubleTap(cell)
-                            },
-                            onTap = { offset ->
-                                val cell = positionToCell(offset, cellSize, photoWidth, photoHeight)
+                            onTap = { tapOffset ->
+                                val cell = positionToCell(tapOffset, cellSize, photoWidth, photoHeight)
                                 onCellSingleTap(cell)
                             }
                         )
@@ -989,7 +981,7 @@ private fun ProjectBottomBar(
             enabled = selectedRegion != null || showRegionCard
         )
         
-        // View/Check button - active when a region is selected in view mode
+        // View/Check button - changes label based on mode
         NavigationBarItem(
             selected = false,
             onClick = { 
@@ -1005,7 +997,7 @@ private fun ProjectBottomBar(
                 val isEnabled = selectedRegion != null || (isEditing && hasSelectedCells) || (showRegionCard && hasRegionChanges)
                 Icon(
                     Icons.Default.Check,
-                    contentDescription = "View",
+                    contentDescription = if (isEditing) "Create" else "View",
                     tint = if (isEnabled) {
                         MaterialTheme.colorScheme.primary
                     } else {
@@ -1013,7 +1005,12 @@ private fun ProjectBottomBar(
                     }
                 )
             },
-            label = { Text(stringResource(R.string.view)) },
+            label = { 
+                Text(
+                    if (isEditing) stringResource(R.string.create_label) 
+                    else stringResource(R.string.view)
+                ) 
+            },
             enabled = selectedRegion != null || (isEditing && hasSelectedCells) || (showRegionCard && hasRegionChanges)
         )
     }

@@ -180,7 +180,11 @@ class ProjectViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(searchQuery = query)
         if (query.isNotBlank()) {
             val matchingIds = regions.value
-                .filter { it.name.contains(query, ignoreCase = true) }
+                .filter { region ->
+                    region.name.contains(query, ignoreCase = true) ||
+                    region.type1?.contains(query, ignoreCase = true) == true ||
+                    region.type2?.contains(query, ignoreCase = true) == true
+                }
                 .map { it.id }
                 .toSet()
             _uiState.value = _uiState.value.copy(highlightedRegionIds = matchingIds)
@@ -190,11 +194,6 @@ class ProjectViewModel @Inject constructor(
     }
     
     // Grid operations
-    fun onCellDoubleTap(cell: Cell) {
-        gridManager.startNewSelection(cell)
-        _uiState.value = _uiState.value.copy(showCreateRegionDialog = true)
-    }
-    
     fun onCellSingleTap(cell: Cell) {
         gridManager.toggleCellSelection(cell)
     }
@@ -458,7 +457,7 @@ class ProjectViewModel @Inject constructor(
         val fileName = "${type}_${regionId}_$timestamp.$extension"
         val destFile = File(mediaDir, fileName)
         
-        // Copy from source to destination
+        // Copy from source to destination - this preserves all metadata including EXIF orientation
         context.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
             FileOutputStream(destFile).use { outputStream ->
                 inputStream.copyTo(outputStream)

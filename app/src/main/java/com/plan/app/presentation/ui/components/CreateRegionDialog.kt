@@ -270,7 +270,8 @@ fun CreateRegionDialog(
                     onValueChange = { type1 = it },
                     label = { Text(stringResource(R.string.type1)) },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    minLines = 2,
+                    maxLines = 4
                 )
                 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -281,7 +282,8 @@ fun CreateRegionDialog(
                     onValueChange = { type2 = it },
                     label = { Text(stringResource(R.string.type2)) },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    minLines = 2,
+                    maxLines = 4
                 )
                 
                 Spacer(modifier = Modifier.height(8.dp))

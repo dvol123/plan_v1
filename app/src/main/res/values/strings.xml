@@ -19,6 +19,7 @@
     <string name="star">Project</string>
     <string name="edit">Change</string>
     <string name="view">View</string>
+    <string name="create_label">Create</string>
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
     <string name="delete">Delete</string>
