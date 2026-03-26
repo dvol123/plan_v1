@@ -1535,8 +1535,7 @@ class ExportManager @Inject constructor(
         }
         builder.append("</div>")
         builder.append("</div>")
-        builder.append("</div>")
-        // Horizontal resizer
+        // Horizontal resizer between tree and info panels
         builder.append("<div class='h-resizer' id='hResizer'></div>")
         // Part 2: Info panel
         builder.append("<div class='panel info-panel' id='infoPanel'>")
@@ -1545,7 +1544,7 @@ class ExportManager @Inject constructor(
         builder.append("<div class='empty-state'><div class='empty-state-icon'>📋</div><div>Select a project or region to view details</div></div>")
         builder.append("</div>")
         builder.append("</div>")
-        builder.append("</div>")
+        builder.append("</div>") // Close left-column
         // Vertical resizer
         builder.append("<div class='resizer' id='vResizer'></div>")
         // Right column (Part 3: Media panel)
@@ -1688,10 +1687,18 @@ class ExportManager @Inject constructor(
         builder.append("if(p.type1)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Type 1</div><div class=\\'info-value\\'>'+p.type1+'</div></div>';")
         builder.append("if(p.type2)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Type 2</div><div class=\\'info-value\\'>'+p.type2+'</div></div>';")
         builder.append("if(p.note)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Note</div><div class=\\'info-value\\'>'+p.note+'</div></div>';")
-        builder.append("if(p.photoPath)infoHtml+='<span class=\\'photo-link\\' onclick=\\'showProjectPhoto('+index+')\\'>📷 View photo with areas</span>';")
         builder.append("infoContent.innerHTML=infoHtml;")
-        builder.append("document.getElementById('mediaContent').innerHTML='<div class=\\'empty-state\\'><div class=\\'empty-state-icon\\'>📷</div><div>Select a region to view media content</div></div>';")
+        // Show project photo in media panel
+        builder.append("const mediaContent=document.getElementById('mediaContent');")
+        builder.append("if(p.photoPath){")
+        builder.append("currentMediaList=[{type:'photo',path:p.photoPath}];")
+        builder.append("document.getElementById('mediaCount').textContent='1 item';")
+        builder.append("mediaContent.innerHTML='<div class=\\'media-grid\\'><div class=\\'media-item\\' onclick=\\'openMediaItem(0)\\'><img src=\\''+p.photoPath+'\\' alt=\\'Photo with areas\\' loading=\\'lazy\\'><div class=\\'media-caption\\'><span class=\\'media-type photo\\'>Photo with areas</span></div></div></div>';")
+        builder.append("}else{")
+        builder.append("currentMediaList=[];")
         builder.append("document.getElementById('mediaCount').textContent='0 items';")
+        builder.append("mediaContent.innerHTML='<div class=\\'empty-state\\'><div class=\\'empty-state-icon\\'>📷</div><div>No photo available</div></div>';")
+        builder.append("}")
         builder.append("}")
         // Show project photo
         builder.append("function showProjectPhoto(index){")
