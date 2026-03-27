@@ -5,9 +5,11 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
 import android.net.Uri
+import androidx.exifinterface.media.ExifInterface
 import com.plan.app.domain.model.Cell
 import com.plan.app.domain.model.Content
 import com.plan.app.domain.model.ContentType
@@ -180,7 +182,7 @@ class ExportManager @Inject constructor(
                 
                 val photoFile = getFileFromUri(project.photoUri)
                 if (photoFile != null && photoFile.exists()) {
-                    val bitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
+                    val bitmap = loadBitmapWithExifOrientation(photoFile)
                     if (bitmap != null) {
                         val photoWithAreas = drawRegionsOnBitmap(bitmap, regions, states, project.cellSize)
                         File(outputDir, "photo_with_areas.jpg").writeBytes(
@@ -243,6 +245,44 @@ class ExportManager @Inject constructor(
                 false
             }
         }
+    }
+    
+    /**
+     * Load bitmap with correct EXIF orientation.
+     */
+    private fun loadBitmapWithExifOrientation(file: File): Bitmap? {
+        val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return null
+        
+        try {
+            val exif = ExifInterface(file.absolutePath)
+            val orientation = exif.getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL
+            )
+            
+            val rotationDegrees = when (orientation) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                else -> 0f
+            }
+            
+            if (rotationDegrees != 0f) {
+                val matrix = Matrix()
+                matrix.postRotate(rotationDegrees)
+                val rotatedBitmap = Bitmap.createBitmap(
+                    bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
+                )
+                if (rotatedBitmap != bitmap) {
+                    bitmap.recycle()
+                }
+                return rotatedBitmap
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        
+        return bitmap
     }
     
     private fun drawRegionsOnBitmap(
@@ -660,6 +700,11 @@ class ExportManager @Inject constructor(
         builder.append(".footer{padding:12px 16px;background:#f5f5f5;border-top:1px solid #ddd;font-size:11px;color:#888;text-align:center;flex-shrink:0;}")
         // Region badge
         builder.append(".region-badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;background:#e0e0e0;color:#666;margin-left:auto;}")
+        // Filter controls
+        builder.append(".filter-container{padding:8px;background:#f5f5f5;border-bottom:1px solid #e0e0e0;}")
+        builder.append(".filter-label{font-size:11px;color:#666;margin-bottom:4px;display:block;}")
+        builder.append(".filter-select{width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;background:#fff;cursor:pointer;}")
+        builder.append(".filter-select:focus{outline:none;border-color:#1976d2;}")
         builder.append("</style>")
         builder.append("</head>")
         builder.append("<body>")
@@ -669,6 +714,17 @@ class ExportManager @Inject constructor(
         // Part 1: Tree panel
         builder.append("<div class='panel tree-panel' id='treePanel'>")
         builder.append("<div class='panel-header light'><span>Projects & Regions</span><span id='regionCount'>${regions.size} regions</span></div>")
+        // Filter by state
+        builder.append("<div class='filter-container'>")
+        builder.append("<label class='filter-label'>Filter by State:</label>")
+        builder.append("<select class='filter-select' id='stateFilter' onchange='filterByState(this.value)'>")
+        builder.append("<option value=''>All States</option>")
+        for (state in states) {
+            val colorHex = "#${Integer.toHexString(state.color).substring(2).uppercase()}"
+            builder.append("<option value='${state.id}'>${escapeHtml(state.name)}</option>")
+        }
+        builder.append("</select>")
+        builder.append("</div>")
         builder.append("<div class='panel-content' id='treeContent'>")
         // Tree structure
         builder.append("<div class='tree-item project active' onclick='selectProject()'>")
@@ -680,7 +736,8 @@ class ExportManager @Inject constructor(
             val state = region.stateId?.let { stateId -> states.find { it.id == stateId } }
             val colorHex = if (state != null) "#${Integer.toHexString(state.color).substring(2).uppercase()}" else "#9e9e9e"
             val contentCount = regionContentsMap[region.id]?.size ?: 0
-            builder.append("<div class='tree-item region' data-region-id='${region.id}' onclick='selectRegion(${region.id})'>")
+            val stateIdValue = region.stateId?.toString() ?: ""
+            builder.append("<div class='tree-item region' data-region-id='${region.id}' data-state-id='$stateIdValue' onclick='selectRegion(${region.id})'>")
             builder.append("<span class='color-indicator' style='background-color:$colorHex;'></span>")
             builder.append("<span style='flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>${escapeHtml(region.name)}</span>")
             if (contentCount > 0) {
@@ -906,6 +963,20 @@ class ExportManager @Inject constructor(
         builder.append("currentMediaIndex=newIndex;")
         builder.append("updateViewerContent();")
         builder.append("}")
+        builder.append("}")
+        // Filter by state
+        builder.append("function filterByState(stateId){")
+        builder.append("const regions=document.querySelectorAll('.tree-item.region');")
+        builder.append("let visibleCount=0;")
+        builder.append("regions.forEach(function(region){")
+        builder.append("if(stateId===''||region.getAttribute('data-state-id')===stateId){")
+        builder.append("region.style.display='flex';")
+        builder.append("visibleCount++;")
+        builder.append("}else{")
+        builder.append("region.style.display='none';")
+        builder.append("}")
+        builder.append("});")
+        builder.append("document.getElementById('regionCount').textContent=visibleCount+' region'+(visibleCount!==1?'s':'');")
         builder.append("}")
         // Keyboard navigation
         builder.append("document.addEventListener('keydown',function(e){")
@@ -1167,7 +1238,7 @@ class ExportManager @Inject constructor(
                 // Create photo with areas overlay
                 val photoFile = getFileFromUri(project.photoUri)
                 if (photoFile != null && photoFile.exists()) {
-                    val bitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
+                    val bitmap = loadBitmapWithExifOrientation(photoFile)
                     if (bitmap != null) {
                         val photoWithAreas = drawRegionsOnBitmap(bitmap, regions, states, project.cellSize)
                         File(tempDir, "photo_with_areas.jpg").writeBytes(
@@ -1270,7 +1341,7 @@ class ExportManager @Inject constructor(
                     val photoFile = getFileFromUri(project.photoUri)
                     var photoPath: String? = null
                     if (photoFile != null && photoFile.exists()) {
-                        val bitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
+                        val bitmap = loadBitmapWithExifOrientation(photoFile)
                         if (bitmap != null) {
                             val photoWithAreas = drawRegionsOnBitmap(bitmap, regions, states, project.cellSize)
                             val safeProjectName = project.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")

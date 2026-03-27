@@ -5,12 +5,15 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.plan.app.presentation.navigation.AppNavigation
 import com.plan.app.presentation.theme.PlanTheme
+import com.plan.app.presentation.ui.components.AppPreferences
 import dagger.hilt.android.AndroidEntryPoint
 import java.util.Locale
 
@@ -38,8 +41,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Get saved theme preference
+        val savedTheme = AppPreferences.getTheme(this)
+        
         setContent {
-            PlanTheme {
+            val darkTheme = when (savedTheme) {
+                1 -> false // Light
+                2 -> true  // Dark
+                else -> isSystemInDarkTheme() // System default
+            }
+            
+            PlanTheme(darkTheme = darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

@@ -10,6 +10,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,7 +29,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -51,6 +56,8 @@ import com.plan.app.domain.model.ContentType
 import com.plan.app.domain.model.Region
 import com.plan.app.domain.model.State
 import java.io.File
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Dialog for displaying and editing region details.
@@ -836,6 +843,18 @@ private fun FullscreenMediaViewer(
     val lifecycleOwner = LocalLifecycleOwner.current
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
     
+    // Zoom state for photos
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+    
+    // Reset zoom when changing media
+    LaunchedEffect(currentIndex) {
+        scale = 1f
+        offsetX = 0f
+        offsetY = 0f
+    }
+    
     // Safe release function for ExoPlayer
     fun safeReleasePlayer() {
         try {
@@ -876,13 +895,26 @@ private fun FullscreenMediaViewer(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
             dismissOnBackPress = true,
-            dismissOnClickOutside = true
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
         )
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
+                .pointerInput(mediaContents.size) {
+                    // Swipe gesture for navigation
+                    detectHorizontalDragGestures { _, dragAmount ->
+                        if (scale == 1f) { // Only swipe when not zoomed
+                            if (dragAmount < -100 && currentIndex < mediaContents.size - 1) {
+                                currentIndex++
+                            } else if (dragAmount > 100 && currentIndex > 0) {
+                                currentIndex--
+                            }
+                        }
+                    }
+                }
         ) {
             // Close button
             IconButton(
@@ -904,15 +936,38 @@ private fun FullscreenMediaViewer(
             // Media content
             when (content.type) {
                 ContentType.PHOTO -> {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(content.data)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "Photo",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectTransformGestures { _, pan, zoom, _ ->
+                                    scale = max(0.5f, min(5f, scale * zoom))
+                                    
+                                    val maxOffsetX = (size.width * (scale - 1) / 2)
+                                    val maxOffsetY = (size.height * (scale - 1) / 2)
+                                    
+                                    offsetX = max(-maxOffsetX, min(maxOffsetX, offsetX + pan.x))
+                                    offsetY = max(-maxOffsetY, min(maxOffsetY, offsetY + pan.y))
+                                }
+                            }
+                    ) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(content.data)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Photo",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer(
+                                    scaleX = scale,
+                                    scaleY = scale,
+                                    translationX = offsetX,
+                                    translationY = offsetY
+                                ),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
                 }
                 ContentType.VIDEO -> {
                     // Initialize ExoPlayer safely
@@ -963,6 +1018,7 @@ private fun FullscreenMediaViewer(
                         modifier = Modifier
                             .align(Alignment.CenterStart)
                             .padding(16.dp)
+                            .zIndex(1f)
                             .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                     ) {
                         Icon(
@@ -981,6 +1037,7 @@ private fun FullscreenMediaViewer(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .padding(16.dp)
+                            .zIndex(1f)
                             .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                     ) {
                         Icon(
@@ -999,6 +1056,7 @@ private fun FullscreenMediaViewer(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(16.dp)
+                        .zIndex(1f)
                         .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
                         .padding(horizontal = 12.dp, vertical = 4.dp)
                 )

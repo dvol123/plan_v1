@@ -1,5 +1,6 @@
 package com.plan.app.presentation.ui.components
 
+import android.app.Activity
 import android.content.Context
 import android.os.Build
 import android.os.LocaleList
@@ -93,6 +94,9 @@ fun SettingsDialog(
     var selectedLanguage by remember { mutableStateOf(AppLanguage.entries.find { it.code == savedLanguageCode } ?: AppLanguage.ENGLISH) }
     var selectedTheme by remember { mutableStateOf(savedTheme) }
     var showRestartMessage by remember { mutableStateOf(false) }
+    var themeChanged by remember { mutableStateOf(false) }
+    
+    val activity = LocalContext.current as? Activity
     
     val languages = AppLanguage.entries
     
@@ -102,11 +106,14 @@ fun SettingsDialog(
         2 to stringResource(R.string.theme_dark)
     )
     
-    // Show restart message when language is changed
+    // Show restart message when language or theme is changed
     if (showRestartMessage) {
         AlertDialog(
             onDismissRequest = { 
                 showRestartMessage = false
+                if (themeChanged) {
+                    activity?.recreate()
+                }
                 onDismiss()
             },
             title = { Text(stringResource(R.string.settings)) },
@@ -114,8 +121,10 @@ fun SettingsDialog(
             confirmButton = {
                 TextButton(onClick = { 
                     showRestartMessage = false
+                    if (themeChanged) {
+                        activity?.recreate()
+                    }
                     onDismiss()
-                    // The activity will be recreated when user navigates back
                 }) {
                     Text(stringResource(R.string.ok))
                 }
@@ -179,8 +188,12 @@ fun SettingsDialog(
                             RadioButton(
                                 selected = selectedTheme == themeMode,
                                 onClick = { 
-                                    selectedTheme = themeMode
-                                    AppPreferences.saveTheme(context, themeMode)
+                                    if (selectedTheme != themeMode) {
+                                        selectedTheme = themeMode
+                                        AppPreferences.saveTheme(context, themeMode)
+                                        themeChanged = true
+                                        showRestartMessage = true
+                                    }
                                 }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
