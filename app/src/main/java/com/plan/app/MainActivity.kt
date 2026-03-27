@@ -8,7 +8,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -16,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.plan.app.presentation.navigation.AppNavigation
 import com.plan.app.presentation.theme.PlanTheme
 import com.plan.app.presentation.ui.components.AppPreferences
@@ -51,12 +57,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
-        // Set up uncaught exception handler to prevent white screen
-        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            Log.e(TAG, "Uncaught exception in thread ${thread.name}", throwable)
-            // Don't crash - just log
-        }
-        
         setContent {
             // Observe theme changes
             var themeMode by remember { mutableIntStateOf(AppPreferences.getTheme(this@MainActivity)) }
@@ -72,21 +72,29 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    // Error boundary wrapper
+                    // Error boundary wrapper with recovery
                     var hasError by remember { mutableStateOf(false) }
+                    var errorCount by remember { mutableStateOf(0) }
                     
-                    if (hasError) {
-                        // Fallback UI on error
+                    if (hasError && errorCount > 3) {
+                        // Too many errors - show restart button
+                        ErrorScreen(onRestart = {
+                            hasError = false
+                            errorCount = 0
+                        })
+                    } else if (hasError) {
+                        // Show loading and auto-retry
+                        LaunchedEffect(Unit) {
+                            hasError = false
+                        }
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = "An error occurred. Please restart the app.",
-                                color = MaterialTheme.colorScheme.error
-                            )
+                            CircularProgressIndicator()
                         }
                     } else {
+                        // Main content with error handling
                         AppNavigation(
                             onThemeChanged = { newThemeMode ->
                                 themeMode = newThemeMode
@@ -94,6 +102,7 @@ class MainActivity : ComponentActivity() {
                             onError = { error ->
                                 Log.e(TAG, "Navigation error", error)
                                 hasError = true
+                                errorCount++
                             }
                         )
                     }
@@ -119,5 +128,38 @@ class MainActivity : ComponentActivity() {
             @Suppress("DEPRECATION")
             context.createConfigurationContext(config)
         }
+    }
+}
+
+@Composable
+private fun ErrorScreen(onRestart: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.weight(1f))
+        
+        Text(
+            text = "Произошла ошибка",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.error
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Text(
+            text = "Пожалуйста, перезапустите приложение",
+            style = MaterialTheme.typography.bodyLarge
+        )
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        Button(onClick = onRestart) {
+            Text("Перезапустить")
+        }
+        
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
