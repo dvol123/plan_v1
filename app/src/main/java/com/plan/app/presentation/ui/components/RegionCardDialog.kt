@@ -68,6 +68,7 @@ import java.io.File
 import java.io.InputStream
 import kotlin.math.max
 import kotlin.math.min
+import kotlinx.coroutines.launch
 
 /**
  * Dialog for displaying and editing region details.
@@ -849,6 +850,7 @@ private fun FullscreenMediaViewer(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val coroutineScope = rememberCoroutineScope()
     
     // Pager state for swipe between photos
     val pagerState = rememberPagerState(
@@ -994,7 +996,9 @@ private fun FullscreenMediaViewer(
                     IconButton(
                         onClick = { 
                             safeReleasePlayer()
-                            // Will be handled by pager
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(currentIndex - 1)
+                            }
                         },
                         modifier = Modifier
                             .align(Alignment.CenterStart)
@@ -1016,7 +1020,9 @@ private fun FullscreenMediaViewer(
                     IconButton(
                         onClick = { 
                             safeReleasePlayer()
-                            // Will be handled by pager
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(currentIndex + 1)
+                            }
                         },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
