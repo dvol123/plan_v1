@@ -542,9 +542,9 @@ private fun ZoomablePhotoWithOverlay(
     var photoWidth by remember { mutableStateOf(0) }
     var photoHeight by remember { mutableStateOf(0) }
     
-    // Original image dimensions for proper scaling
-    var originalImageWidth by remember { mutableStateOf(0) }
-    var originalImageHeight by remember { mutableStateOf(0) }
+    // Original image dimensions for proper scaling - use rememberSaveable to survive orientation changes
+    var originalImageWidth by rememberSaveable { mutableStateOf(0) }
+    var originalImageHeight by rememberSaveable { mutableStateOf(0) }
     
     // Zoom state
     var scale by remember { mutableFloatStateOf(1f) }

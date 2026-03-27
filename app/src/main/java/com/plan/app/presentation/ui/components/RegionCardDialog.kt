@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
@@ -1077,27 +1078,30 @@ private fun ZoomablePhoto(
             .fillMaxSize()
             .onSizeChanged { containerSize = it }
             .pointerInput(Unit) {
-                // Detect pinch gestures for zoom - works alongside pager
-                detectTransformGestures { _, pan, zoom, _ ->
-                    // Only process zoom gestures (pinch)
-                    if (zoom != 1f) {
-                        val newScale = (scale * zoom).coerceIn(0.5f, 5f)
+                // Handle all gestures in one place
+                detectTransformGestures { centroid, pan, zoom, rotation ->
+                    // Calculate new scale
+                    val newScale = (scale * zoom).coerceIn(1f, 5f)
+                    
+                    if (newScale > 1f) {
+                        // When zoomed in, apply zoom and pan
+                        val maxOffsetX = (containerSize.width * (newScale - 1) / 2f)
+                        val maxOffsetY = (containerSize.height * (newScale - 1) / 2f)
                         
-                        if (newScale > 1f) {
-                            val maxOffsetX = (containerSize.width * (newScale - 1) / 2f)
-                            val maxOffsetY = (containerSize.height * (newScale - 1) / 2f)
-                            
-                            offsetX = (offsetX + pan.x * newScale).coerceIn(-maxOffsetX, maxOffsetX)
-                            offsetY = (offsetY + pan.y * newScale).coerceIn(-maxOffsetY, maxOffsetY)
-                        }
-                        
-                        scale = newScale
-                        
-                        // Reset offset if zoomed out
-                        if (scale <= 1f) {
-                            offsetX = 0f
-                            offsetY = 0f
-                        }
+                        // Adjust offset for zoom centered on centroid
+                        val scaleChange = newScale / scale
+                        offsetX = (offsetX * scaleChange - (centroid.x - containerSize.width / 2f) * (scaleChange - 1) + pan.x * newScale)
+                            .coerceIn(-maxOffsetX, maxOffsetX)
+                        offsetY = (offsetY * scaleChange - (centroid.y - containerSize.height / 2f) * (scaleChange - 1) + pan.y * newScale)
+                            .coerceIn(-maxOffsetY, maxOffsetY)
+                    }
+                    
+                    scale = newScale
+                    
+                    // Reset offset if zoomed out
+                    if (scale <= 1f) {
+                        offsetX = 0f
+                        offsetY = 0f
                     }
                 }
             }

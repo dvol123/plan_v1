@@ -87,20 +87,15 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     } else {
-                        try {
-                            AppNavigation(
-                                onThemeChanged = { newThemeMode ->
-                                    themeMode = newThemeMode
-                                },
-                                onError = { error ->
-                                    Log.e(TAG, "Navigation error", error)
-                                    hasError = true
-                                }
-                            )
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error in AppNavigation", e)
-                            hasError = true
-                        }
+                        AppNavigation(
+                            onThemeChanged = { newThemeMode ->
+                                themeMode = newThemeMode
+                            },
+                            onError = { error ->
+                                Log.e(TAG, "Navigation error", error)
+                                hasError = true
+                            }
+                        )
                     }
                 }
             }
