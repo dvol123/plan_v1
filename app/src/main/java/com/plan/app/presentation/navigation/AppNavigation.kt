@@ -51,7 +51,8 @@ class DebounceNavigator(
 @Composable
 fun AppNavigation(
     navController: NavHostController = rememberNavController(),
-    onThemeChanged: (Int) -> Unit = {}
+    onThemeChanged: (Int) -> Unit = {},
+    onError: (Exception) -> Unit = {}
 ) {
     // Debounce navigator to prevent rapid clicks
     val debounceNavigator = remember { DebounceNavigator(CoroutineScope(Dispatchers.Main)) }
@@ -69,8 +70,13 @@ fun AppNavigation(
                     if (!isNavigating) {
                         isNavigating = true
                         debounceNavigator.navigate {
-                            navController.navigate(Screen.Project.createRoute(projectId))
-                            isNavigating = false
+                            try {
+                                navController.navigate(Screen.Project.createRoute(projectId))
+                            } catch (e: Exception) {
+                                onError(e)
+                            } finally {
+                                isNavigating = false
+                            }
                         }
                     }
                 },
@@ -86,8 +92,13 @@ fun AppNavigation(
                     if (!isNavigating) {
                         isNavigating = true
                         debounceNavigator.navigate {
-                            navController.popBackStack()
-                            isNavigating = false
+                            try {
+                                navController.popBackStack()
+                            } catch (e: Exception) {
+                                onError(e)
+                            } finally {
+                                isNavigating = false
+                            }
                         }
                     }
                 }

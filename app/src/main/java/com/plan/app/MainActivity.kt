@@ -2,14 +2,19 @@ package com.plan.app
 
 import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.plan.app.presentation.navigation.AppNavigation
 import com.plan.app.presentation.theme.PlanTheme
@@ -22,6 +27,10 @@ import java.util.Locale
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    
+    companion object {
+        private const val TAG = "MainActivity"
+    }
     
     override fun attachBaseContext(newBase: Context) {
         // Apply saved locale before activity is created - Russian by default
@@ -42,6 +51,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
+        // Set up uncaught exception handler to prevent white screen
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            Log.e(TAG, "Uncaught exception in thread ${thread.name}", throwable)
+            // Don't crash - just log
+        }
+        
         setContent {
             // Observe theme changes
             var themeMode by remember { mutableIntStateOf(AppPreferences.getTheme(this@MainActivity)) }
@@ -57,11 +72,36 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavigation(
-                        onThemeChanged = { newThemeMode ->
-                            themeMode = newThemeMode
+                    // Error boundary wrapper
+                    var hasError by remember { mutableStateOf(false) }
+                    
+                    if (hasError) {
+                        // Fallback UI on error
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "An error occurred. Please restart the app.",
+                                color = MaterialTheme.colorScheme.error
+                            )
                         }
-                    )
+                    } else {
+                        try {
+                            AppNavigation(
+                                onThemeChanged = { newThemeMode ->
+                                    themeMode = newThemeMode
+                                },
+                                onError = { error ->
+                                    Log.e(TAG, "Navigation error", error)
+                                    hasError = true
+                                }
+                            )
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error in AppNavigation", e)
+                            hasError = true
+                        }
+                    }
                 }
             }
         }
