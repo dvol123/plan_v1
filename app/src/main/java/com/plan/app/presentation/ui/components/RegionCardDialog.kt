@@ -54,6 +54,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.Lifecycle
+import kotlin.math.pow
+import kotlin.math.sqrt
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -1066,6 +1068,9 @@ private fun ZoomablePhoto(
     // Container size for boundary checks
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     
+    // For pinch gesture detection
+    var previousDistance by remember { mutableFloatStateOf(0f) }
+    
     // Reset zoom when content changes
     LaunchedEffect(contentData) {
         scale = 1f
@@ -1077,55 +1082,112 @@ private fun ZoomablePhoto(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { containerSize = it }
-            .pointerInput(Unit) {
-                // Handle all gestures in one place
-                detectTransformGestures { centroid, pan, zoom, rotation ->
-                    // Calculate new scale
-                    val newScale = (scale * zoom).coerceIn(1f, 5f)
-                    
-                    if (newScale > 1f) {
-                        // When zoomed in, apply zoom and pan
-                        val maxOffsetX = (containerSize.width * (newScale - 1) / 2f)
-                        val maxOffsetY = (containerSize.height * (newScale - 1) / 2f)
-                        
-                        // Adjust offset for zoom centered on centroid
-                        val scaleChange = newScale / scale
-                        offsetX = (offsetX * scaleChange - (centroid.x - containerSize.width / 2f) * (scaleChange - 1) + pan.x * newScale)
-                            .coerceIn(-maxOffsetX, maxOffsetX)
-                        offsetY = (offsetY * scaleChange - (centroid.y - containerSize.height / 2f) * (scaleChange - 1) + pan.y * newScale)
-                            .coerceIn(-maxOffsetY, maxOffsetY)
-                    }
-                    
-                    scale = newScale
-                    
-                    // Reset offset if zoomed out
-                    if (scale <= 1f) {
-                        offsetX = 0f
-                        offsetY = 0f
-                    }
-                }
-            }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onDoubleTap = { tapOffset ->
-                        // Toggle between 1x and 2x zoom on double tap
-                        if (scale > 1.5f) {
-                            // Reset to 1x
-                            scale = 1f
-                            offsetX = 0f
-                            offsetY = 0f
-                        } else {
-                            // Zoom to 2x centered on tap point
-                            scale = 2f
-                            // Center the zoom on the tap point
-                            val centerX = containerSize.width / 2f
-                            val centerY = containerSize.height / 2f
-                            offsetX = (centerX - tapOffset.x).coerceIn(-containerSize.width / 2f, containerSize.width / 2f)
-                            offsetY = (centerY - tapOffset.y).coerceIn(-containerSize.height / 2f, containerSize.height / 2f)
+            // Only handle gestures when zoomed in - let HorizontalPager handle swipe when not zoomed
+            .then(
+                if (scale > 1f) {
+                    Modifier.pointerInput(Unit) {
+                        detectTransformGestures { centroid, pan, zoom, _ ->
+                            val newScale = (scale * zoom).coerceIn(1f, 5f)
+                            
+                            if (newScale > 1f) {
+                                val maxOffsetX = (containerSize.width * (newScale - 1) / 2f)
+                                val maxOffsetY = (containerSize.height * (newScale - 1) / 2f)
+                                
+                                offsetX = (offsetX + pan.x).coerceIn(-maxOffsetX, maxOffsetX)
+                                offsetY = (offsetY + pan.y).coerceIn(-maxOffsetY, maxOffsetY)
+                            }
+                            
+                            scale = newScale
+                            
+                            if (scale <= 1f) {
+                                scale = 1f
+                                offsetX = 0f
+                                offsetY = 0f
+                            }
                         }
                     }
-                )
-            },
+                } else {
+                    // When not zoomed, only handle pinch-to-zoom and double-tap
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = { tapOffset ->
+                                // Zoom to 2x centered on tap point
+                                scale = 2f
+                                val centerX = containerSize.width / 2f
+                                val centerY = containerSize.height / 2f
+                                offsetX = (centerX - tapOffset.x).coerceIn(-containerSize.width / 2f, containerSize.width / 2f)
+                                offsetY = (centerY - tapOffset.y).coerceIn(-containerSize.height / 2f, containerSize.height / 2f)
+                            }
+                        )
+                    }
+                        .pointerInput(Unit) {
+                            // Pinch to zoom when not zoomed - use awaitPointerEventScope for low-level control
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    
+                                    if (event.changes.size == 2) {
+                                        // Two fingers = pinch gesture
+                                        val finger1 = event.changes[0]
+                                        val finger2 = event.changes[1]
+                                        
+                                        val currentDistance = sqrt(
+                                            (finger1.position.x - finger2.position.x).pow(2) +
+                                            (finger1.position.y - finger2.position.y).pow(2)
+                                        )
+                                        
+                                        if (previousDistance > 0 && currentDistance > 0) {
+                                            val zoomFactor = currentDistance / previousDistance
+                                            
+                                            if (zoomFactor > 1.05f || zoomFactor < 0.95f) {
+                                                // Significant zoom change
+                                                val newScale = (scale * zoomFactor).coerceIn(1f, 5f)
+                                                
+                                                if (newScale > 1.1f) {
+                                                    // Start zooming
+                                                    scale = newScale
+                                                    
+                                                    // Calculate centroid
+                                                    val centroidX = (finger1.position.x + finger2.position.x) / 2f
+                                                    val centroidY = (finger1.position.y + finger2.position.y) / 2f
+                                                    val centerX = containerSize.width / 2f
+                                                    val centerY = containerSize.height / 2f
+                                                    offsetX = (centerX - centroidX) * (newScale - 1) / newScale
+                                                    offsetY = (centerY - centroidY) * (newScale - 1) / newScale
+                                                    
+                                                    // Consume events to prevent pager from swiping
+                                                    finger1.consume()
+                                                    finger2.consume()
+                                                }
+                                            }
+                                        }
+                                        
+                                        previousDistance = currentDistance
+                                    } else {
+                                        previousDistance = 0f
+                                    }
+                                }
+                            }
+                        }
+                }
+            )
+            // Handle double-tap when zoomed in to zoom out
+            .then(
+                if (scale > 1f) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                // Reset to 1x
+                                scale = 1f
+                                offsetX = 0f
+                                offsetY = 0f
+                            }
+                        )
+                    }
+                } else {
+                    Modifier
+                }
+            ),
         contentAlignment = Alignment.Center
     ) {
         // Load image with correct orientation
