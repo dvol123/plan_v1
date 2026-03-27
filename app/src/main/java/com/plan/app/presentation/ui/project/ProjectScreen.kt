@@ -542,10 +542,36 @@ private fun ZoomablePhotoWithOverlay(
     var photoWidth by remember { mutableStateOf(0) }
     var photoHeight by remember { mutableStateOf(0) }
     
+    // Original image dimensions for proper scaling
+    var originalImageWidth by remember { mutableStateOf(0) }
+    var originalImageHeight by remember { mutableStateOf(0) }
+    
     // Zoom state
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
+    
+    // Calculate the actual displayed image bounds (after ContentScale.Fit)
+    val imageDisplayRect = remember(photoWidth, photoHeight, originalImageWidth, originalImageHeight) {
+        if (photoWidth > 0 && photoHeight > 0 && originalImageWidth > 0 && originalImageHeight > 0) {
+            val containerAspect = photoWidth.toFloat() / photoHeight
+            val imageAspect = originalImageWidth.toFloat() / originalImageHeight
+            
+            if (containerAspect > imageAspect) {
+                // Container is wider - image is constrained by height
+                val displayWidth = photoHeight * imageAspect
+                val offsetX = (photoWidth - displayWidth) / 2
+                android.graphics.RectF(offsetX, 0f, offsetX + displayWidth, photoHeight.toFloat())
+            } else {
+                // Container is taller - image is constrained by width
+                val displayHeight = photoWidth / imageAspect
+                val offsetY = (photoHeight - displayHeight) / 2
+                android.graphics.RectF(0f, offsetY, photoWidth.toFloat(), offsetY + displayHeight)
+            }
+        } else {
+            android.graphics.RectF(0f, 0f, photoWidth.toFloat(), photoHeight.toFloat())
+        }
+    }
     
     Box(
         modifier = Modifier
@@ -561,8 +587,8 @@ private fun ZoomablePhotoWithOverlay(
                         detectTransformGestures { _, pan, zoom, _ ->
                             scale = max(0.5f, min(5f, scale * zoom))
                             
-                            val maxOffsetX = (size.width * (scale - 1) / 2)
-                            val maxOffsetY = (size.height * (scale - 1) / 2)
+                            val maxOffsetX = (photoWidth * (scale - 1) / 2)
+                            val maxOffsetY = (photoHeight * (scale - 1) / 2)
                             
                             offsetX = max(-maxOffsetX, min(maxOffsetX, offsetX + pan.x))
                             offsetY = max(-maxOffsetY, min(maxOffsetY, offsetY + pan.y))
@@ -588,10 +614,17 @@ private fun ZoomablePhotoWithOverlay(
                     translationX = offsetX,
                     translationY = offsetY
                 ),
-            contentScale = ContentScale.Fit
+            contentScale = ContentScale.Fit,
+            onSuccess = { state ->
+                // Get original image dimensions
+                state.result.drawable?.let { drawable ->
+                    originalImageWidth = drawable.intrinsicWidth
+                    originalImageHeight = drawable.intrinsicHeight
+                }
+            }
         )
         
-        // Overlay canvas for regions or grid
+        // Overlay canvas for regions or grid - now using imageDisplayRect for proper positioning
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
@@ -601,11 +634,11 @@ private fun ZoomablePhotoWithOverlay(
                     translationX = offsetX,
                     translationY = offsetY
                 )
-                .pointerInput(isEditing, cellSize) {
+                .pointerInput(isEditing, cellSize, imageDisplayRect) {
                     if (isEditing) {
                         detectTapGestures(
                             onTap = { tapOffset ->
-                                val cell = positionToCell(tapOffset, cellSize, photoWidth, photoHeight)
+                                val cell = positionToCell(tapOffset, cellSize, imageDisplayRect)
                                 onCellSingleTap(cell)
                             }
                         )
@@ -616,15 +649,15 @@ private fun ZoomablePhotoWithOverlay(
                 // Draw existing regions first (in editing mode)
                 regions.forEach { region ->
                     val state = states.find { it.id == region.stateId }
-                    drawRegion(region, state, cellSize, photoWidth, photoHeight, isHighlighted = false, isSelected = false, isInEditMode = true)
+                    drawRegion(region, state, cellSize, imageDisplayRect, isHighlighted = false, isSelected = false, isInEditMode = true)
                 }
                 
                 // Draw grid
-                drawGrid(cellSize, photoWidth, photoHeight)
+                drawGrid(cellSize, imageDisplayRect)
                 
                 // Draw selected cells
                 selectedCells.forEach { cell ->
-                    drawSelectedCell(cell, cellSize, photoWidth, photoHeight)
+                    drawSelectedCell(cell, cellSize, imageDisplayRect)
                 }
             } else {
                 // Draw regions
@@ -632,7 +665,7 @@ private fun ZoomablePhotoWithOverlay(
                     val state = states.find { it.id == region.stateId }
                     val isHighlighted = highlightedRegionIds.contains(region.id)
                     val isSelected = selectedRegionId == region.id
-                    drawRegion(region, state, cellSize, photoWidth, photoHeight, isHighlighted, isSelected)
+                    drawRegion(region, state, cellSize, imageDisplayRect, isHighlighted, isSelected)
                 }
             }
         }
@@ -648,11 +681,11 @@ private fun ZoomablePhotoWithOverlay(
                         translationX = offsetX,
                         translationY = offsetY
                     )
-                    .pointerInput(regions) {
+                    .pointerInput(regions, cellSize, imageDisplayRect) {
                         detectTapGestures(
                             onDoubleTap = { offset ->
                                 val tappedRegion = findTappedRegion(
-                                    offset, regions, cellSize, photoWidth, photoHeight
+                                    offset, regions, cellSize, imageDisplayRect
                                 )
                                 tappedRegion?.let { onRegionDoubleTap(it) }
                             }
@@ -663,11 +696,15 @@ private fun ZoomablePhotoWithOverlay(
     }
 }
 
-private fun positionToCell(offset: Offset, cellSize: Int, width: Int, height: Int): Cell {
-    val cellWidth = width.toFloat() / cellSize
-    val cellHeight = height.toFloat() / cellSize
-    val col = (offset.x / cellWidth).toInt()
-    val row = (offset.y / cellHeight).toInt()
+private fun positionToCell(offset: Offset, cellSize: Int, imageDisplayRect: android.graphics.RectF): Cell {
+    // Convert tap offset to image-relative coordinates
+    val imageRelativeX = offset.x - imageDisplayRect.left
+    val imageRelativeY = offset.y - imageDisplayRect.top
+    
+    val cellWidth = imageDisplayRect.width() / cellSize
+    val cellHeight = imageDisplayRect.height() / cellSize
+    val col = (imageRelativeX / cellWidth).toInt()
+    val row = (imageRelativeY / cellHeight).toInt()
     return Cell(row = row, col = col)
 }
 
@@ -675,13 +712,16 @@ private fun findTappedRegion(
     offset: Offset,
     regions: List<Region>,
     cellSize: Int,
-    width: Int,
-    height: Int
+    imageDisplayRect: android.graphics.RectF
 ): Region? {
-    val cellWidth = width.toFloat() / cellSize
-    val cellHeight = height.toFloat() / cellSize
-    val col = (offset.x / cellWidth).toInt()
-    val row = (offset.y / cellHeight).toInt()
+    // Convert tap offset to image-relative coordinates
+    val imageRelativeX = offset.x - imageDisplayRect.left
+    val imageRelativeY = offset.y - imageDisplayRect.top
+    
+    val cellWidth = imageDisplayRect.width() / cellSize
+    val cellHeight = imageDisplayRect.height() / cellSize
+    val col = (imageRelativeX / cellWidth).toInt()
+    val row = (imageRelativeY / cellHeight).toInt()
     
     // Find all regions containing this cell, then return the smallest one
     // (smallest by number of cells) to allow selecting smaller regions inside larger ones
@@ -692,11 +732,10 @@ private fun findTappedRegion(
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGrid(
     cellSize: Int,
-    width: Int,
-    height: Int
+    imageDisplayRect: android.graphics.RectF
 ) {
-    val cellWidth = size.width / cellSize
-    val cellHeight = size.height / cellSize
+    val cellWidth = imageDisplayRect.width() / cellSize
+    val cellHeight = imageDisplayRect.height() / cellSize
     
     // Use a solid, highly visible color for the grid
     val gridColor = Color(0xFF000000) // Solid black
@@ -706,16 +745,16 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGrid(
         // Vertical lines
         drawLine(
             color = gridColor,
-            start = Offset(x = i * cellWidth, y = 0f),
-            end = Offset(x = i * cellWidth, y = size.height),
+            start = Offset(x = imageDisplayRect.left + i * cellWidth, y = imageDisplayRect.top),
+            end = Offset(x = imageDisplayRect.left + i * cellWidth, y = imageDisplayRect.bottom),
             strokeWidth = strokeWidth
         )
         
         // Horizontal lines
         drawLine(
             color = gridColor,
-            start = Offset(x = 0f, y = i * cellHeight),
-            end = Offset(x = size.width, y = i * cellHeight),
+            start = Offset(x = imageDisplayRect.left, y = imageDisplayRect.top + i * cellHeight),
+            end = Offset(x = imageDisplayRect.right, y = imageDisplayRect.top + i * cellHeight),
             strokeWidth = strokeWidth
         )
     }
@@ -724,17 +763,16 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGrid(
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSelectedCell(
     cell: Cell,
     cellSize: Int,
-    width: Int,
-    height: Int
+    imageDisplayRect: android.graphics.RectF
 ) {
-    val cellWidth = size.width / cellSize
-    val cellHeight = size.height / cellSize
+    val cellWidth = imageDisplayRect.width() / cellSize
+    val cellHeight = imageDisplayRect.height() / cellSize
     
     drawRect(
         color = Color.Blue.copy(alpha = 0.5f),
         topLeft = Offset(
-            x = cell.col * cellWidth,
-            y = cell.row * cellHeight
+            x = imageDisplayRect.left + cell.col * cellWidth,
+            y = imageDisplayRect.top + cell.row * cellHeight
         ),
         size = Size(cellWidth, cellHeight)
     )
@@ -742,8 +780,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSelectedCell(
     drawRect(
         color = Color.Blue,
         topLeft = Offset(
-            x = cell.col * cellWidth,
-            y = cell.row * cellHeight
+            x = imageDisplayRect.left + cell.col * cellWidth,
+            y = imageDisplayRect.top + cell.row * cellHeight
         ),
         size = Size(cellWidth, cellHeight),
         style = Stroke(width = 2f)
@@ -754,8 +792,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRegion(
     region: Region,
     state: State?,
     cellSize: Int,
-    width: Int,
-    height: Int,
+    imageDisplayRect: android.graphics.RectF,
     isHighlighted: Boolean,
     isSelected: Boolean = false,
     isInEditMode: Boolean = false
@@ -765,8 +802,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRegion(
     // Calculate cell dimensions based on the grid cellSize
     // cellSize represents the number of divisions (e.g., 10 means 10x10 grid)
     val gridDivisions = if (cellSize > 0) cellSize else 10
-    val cellWidth = size.width / gridDivisions.toFloat()
-    val cellHeight = size.height / gridDivisions.toFloat()
+    val cellWidth = imageDisplayRect.width() / gridDivisions
+    val cellHeight = imageDisplayRect.height() / gridDivisions
     
     val color = state?.color?.let { Color(it) } ?: Color.Gray
     
@@ -781,8 +818,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRegion(
         drawRect(
             color = color.copy(alpha = alpha),
             topLeft = Offset(
-                x = cell.col * cellWidth,
-                y = cell.row * cellHeight
+                x = imageDisplayRect.left + cell.col * cellWidth,
+                y = imageDisplayRect.top + cell.row * cellHeight
             ),
             size = Size(cellWidth, cellHeight)
         )
@@ -796,8 +833,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRegion(
                     else -> Color.Gray.copy(alpha = 0.5f) // Subtle border in edit mode
                 },
                 topLeft = Offset(
-                    x = cell.col * cellWidth,
-                    y = cell.row * cellHeight
+                    x = imageDisplayRect.left + cell.col * cellWidth,
+                    y = imageDisplayRect.top + cell.row * cellHeight
                 ),
                 size = Size(cellWidth, cellHeight),
                 style = Stroke(width = if (isSelected) 4f else 3f)

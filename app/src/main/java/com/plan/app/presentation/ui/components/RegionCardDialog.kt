@@ -1072,38 +1072,35 @@ private fun ZoomablePhoto(
         offsetY = 0f
     }
     
-    // Transformable state for pinch zoom
-    val transformableState = rememberTransformableState { zoomChange, panChange, _ ->
-        // Update scale with limits
-        val newScale = (scale * zoomChange).coerceIn(0.5f, 5f)
-        
-        // Only allow panning when zoomed in
-        if (newScale > 1f) {
-            val maxOffsetX = (containerSize.width * (newScale - 1) / 2f)
-            val maxOffsetY = (containerSize.height * (newScale - 1) / 2f)
-            
-            offsetX = (offsetX + panChange.x * newScale).coerceIn(-maxOffsetX, maxOffsetX)
-            offsetY = (offsetY + panChange.y * newScale).coerceIn(-maxOffsetY, maxOffsetY)
-        } else {
-            offsetX = 0f
-            offsetY = 0f
-        }
-        
-        scale = newScale
-    }
-    
     Box(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { containerSize = it }
-            // Only apply transformable when zoomed in - this allows pager to work when not zoomed
-            .then(
-                if (scale > 1f) {
-                    Modifier.transformable(state = transformableState)
-                } else {
-                    Modifier
+            .pointerInput(Unit) {
+                // Detect pinch gestures for zoom - works alongside pager
+                detectTransformGestures { _, pan, zoom, _ ->
+                    // Only process zoom gestures (pinch)
+                    if (zoom != 1f) {
+                        val newScale = (scale * zoom).coerceIn(0.5f, 5f)
+                        
+                        if (newScale > 1f) {
+                            val maxOffsetX = (containerSize.width * (newScale - 1) / 2f)
+                            val maxOffsetY = (containerSize.height * (newScale - 1) / 2f)
+                            
+                            offsetX = (offsetX + pan.x * newScale).coerceIn(-maxOffsetX, maxOffsetX)
+                            offsetY = (offsetY + pan.y * newScale).coerceIn(-maxOffsetY, maxOffsetY)
+                        }
+                        
+                        scale = newScale
+                        
+                        // Reset offset if zoomed out
+                        if (scale <= 1f) {
+                            offsetX = 0f
+                            offsetY = 0f
+                        }
+                    }
                 }
-            )
+            }
             .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = { tapOffset ->

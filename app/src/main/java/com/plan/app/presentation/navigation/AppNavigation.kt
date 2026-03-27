@@ -1,12 +1,21 @@
 package com.plan.app.presentation.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.plan.app.presentation.ui.main.MainScreen
 import com.plan.app.presentation.ui.project.ProjectScreen
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Navigation routes for the app.
@@ -19,6 +28,24 @@ sealed class Screen(val route: String) {
 }
 
 /**
+ * Debounce helper to prevent rapid clicks
+ */
+class DebounceNavigator(
+    private val scope: CoroutineScope,
+    private val delayMs: Long = 300
+) {
+    private var navigationJob: Job? = null
+    
+    fun navigate(action: () -> Unit) {
+        navigationJob?.cancel()
+        navigationJob = scope.launch {
+            delay(delayMs)
+            action()
+        }
+    }
+}
+
+/**
  * Main navigation host.
  */
 @Composable
@@ -26,6 +53,12 @@ fun AppNavigation(
     navController: NavHostController = rememberNavController(),
     onThemeChanged: (Int) -> Unit = {}
 ) {
+    // Debounce navigator to prevent rapid clicks
+    val debounceNavigator = remember { DebounceNavigator(CoroutineScope(Dispatchers.Main)) }
+    
+    // Track if navigation is in progress to prevent double navigation
+    var isNavigating by remember { mutableStateOf(false) }
+    
     NavHost(
         navController = navController,
         startDestination = Screen.Main.route
@@ -33,7 +66,13 @@ fun AppNavigation(
         composable(Screen.Main.route) {
             MainScreen(
                 onProjectClick = { projectId ->
-                    navController.navigate(Screen.Project.createRoute(projectId))
+                    if (!isNavigating) {
+                        isNavigating = true
+                        debounceNavigator.navigate {
+                            navController.navigate(Screen.Project.createRoute(projectId))
+                            isNavigating = false
+                        }
+                    }
                 },
                 onThemeChanged = onThemeChanged
             )
@@ -44,7 +83,13 @@ fun AppNavigation(
             ProjectScreen(
                 projectId = projectId,
                 onNavigateBack = {
-                    navController.popBackStack()
+                    if (!isNavigating) {
+                        isNavigating = true
+                        debounceNavigator.navigate {
+                            navController.popBackStack()
+                            isNavigating = false
+                        }
+                    }
                 }
             )
         }
