@@ -9,6 +9,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -24,14 +27,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -43,7 +51,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.compose.ui.viewinterop.AndroidView
-import me.saket.telephoto.zoomable.ZoomableAsyncImage
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.plan.app.R
@@ -975,20 +982,142 @@ private fun ZoomablePhoto(
 ) {
     val context = LocalContext.current
     
-    // Use Telephoto's ZoomableAsyncImage - it handles:
-    // - Pinch to zoom
-    // - Double tap to zoom
-    // - Pan when zoomed
-    // - Works with HorizontalPager (nested scroll)
-    ZoomableAsyncImage(
-        model = ImageRequest.Builder(context)
-            .data(contentData)
-            .crossfade(true)
-            .build(),
-        contentDescription = "Photo",
-        modifier = Modifier.fillMaxSize(),
-        contentScale = ContentScale.Fit
-    )
+    // Zoom and pan state
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+    
+    // Container size
+    var containerSize by remember { mutableStateOf(IntSize.Zero) }
+    
+    // Reset zoom when content changes
+    LaunchedEffect(contentData) {
+        scale = 1f
+        offsetX = 0f
+        offsetY = 0f
+    }
+    
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { containerSize = it }
+            .pointerInput(Unit) {
+                // Handle pinch-to-zoom and pan gestures
+                forEachGesture {
+                    awaitPointerEventScope {
+                        // Wait for first down
+                        awaitFirstDown()
+                        
+                        // Check if we have multiple pointers
+                        val event = awaitPointerEvent()
+                        
+                        if (event.changes.size >= 2) {
+                            // Two fingers - pinch to zoom
+                            var previousDistance = 0f
+                            
+                            do {
+                                val currentEvent = awaitPointerEvent()
+                                
+                                if (currentEvent.changes.size >= 2) {
+                                    val finger1 = currentEvent.changes[0]
+                                    val finger2 = currentEvent.changes[1]
+                                    
+                                    val currentDistance = kotlin.math.sqrt(
+                                        (finger1.position.x - finger2.position.x) * (finger1.position.x - finger2.position.x) +
+                                        (finger1.position.y - finger2.position.y) * (finger1.position.y - finger2.position.y)
+                                    )
+                                    
+                                    if (previousDistance > 0) {
+                                        val zoomFactor = currentDistance / previousDistance
+                                        val newScale = (scale * zoomFactor).coerceIn(1f, 5f)
+                                        
+                                        // Calculate centroid
+                                        val centroidX = (finger1.position.x + finger2.position.x) / 2f
+                                        val centroidY = (finger1.position.y + finger2.position.y) / 2f
+                                        
+                                        if (newScale > 1f) {
+                                            // Adjust offset to zoom around centroid
+                                            val centerX = containerSize.width / 2f
+                                            val centerY = containerSize.height / 2f
+                                            val maxOffsetX = (containerSize.width * (newScale - 1) / 2f)
+                                            val maxOffsetY = (containerSize.height * (newScale - 1) / 2f)
+                                            
+                                            offsetX = (offsetX * newScale / scale + (centerX - centroidX) * (newScale / scale - 1) / scale)
+                                                .coerceIn(-maxOffsetX, maxOffsetX)
+                                            offsetY = (offsetY * newScale / scale + (centerY - centroidY) * (newScale / scale - 1) / scale)
+                                                .coerceIn(-maxOffsetY, maxOffsetY)
+                                        }
+                                        
+                                        scale = newScale
+                                        
+                                        if (scale <= 1f) {
+                                            scale = 1f
+                                            offsetX = 0f
+                                            offsetY = 0f
+                                        }
+                                    }
+                                    
+                                    previousDistance = currentDistance
+                                    
+                                    // Consume events
+                                    currentEvent.changes.forEach { it.consume() }
+                                }
+                            } while (currentEvent.changes.any { it.pressed })
+                        }
+                    }
+                }
+            }
+            .pointerInput(scale) {
+                // Handle pan and double-tap when zoomed
+                detectTapGestures(
+                    onDoubleTap = { tapOffset ->
+                        if (scale > 1f) {
+                            // Reset zoom
+                            scale = 1f
+                            offsetX = 0f
+                            offsetY = 0f
+                        } else {
+                            // Zoom to 2x centered on tap
+                            scale = 2f
+                            val centerX = containerSize.width / 2f
+                            val centerY = containerSize.height / 2f
+                            offsetX = (centerX - tapOffset.x).coerceIn(-containerSize.width / 2f, containerSize.width / 2f)
+                            offsetY = (centerY - tapOffset.y).coerceIn(-containerSize.height / 2f, containerSize.height / 2f)
+                        }
+                    }
+                )
+            }
+            .pointerInput(scale) {
+                // Handle drag when zoomed (pan)
+                if (scale > 1f) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        val maxOffsetX = (containerSize.width * (scale - 1) / 2f)
+                        val maxOffsetY = (containerSize.height * (scale - 1) / 2f)
+                        offsetX = (offsetX + dragAmount.x).coerceIn(-maxOffsetX, maxOffsetX)
+                        offsetY = (offsetY + dragAmount.y).coerceIn(-maxOffsetY, maxOffsetY)
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(contentData)
+                .crossfade(true)
+                .build(),
+            contentDescription = "Photo",
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offsetX,
+                    translationY = offsetY
+                ),
+            contentScale = ContentScale.Fit
+        )
+    }
 }
 
 /**

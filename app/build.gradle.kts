@@ -93,10 +93,6 @@ dependencies {
     // Image Loading - Coil
     implementation("io.coil-kt:coil-compose:2.5.0")
     
-    // Telephoto for zoomable images (works with HorizontalPager)
-    // Using older version compatible with compileSdk 34
-    implementation("me.saket.telephoto:zoomable-image-coil:0.12.0")
-    
     // PhotoView for zoom
     implementation("com.github.chrisbanes:PhotoView:2.3.0")
     
