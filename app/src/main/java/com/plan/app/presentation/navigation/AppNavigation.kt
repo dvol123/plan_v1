@@ -23,7 +23,8 @@ sealed class Screen(val route: String) {
  */
 @Composable
 fun AppNavigation(
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    onThemeChanged: (Int) -> Unit = {}
 ) {
     NavHost(
         navController = navController,
@@ -33,7 +34,8 @@ fun AppNavigation(
             MainScreen(
                 onProjectClick = { projectId ->
                     navController.navigate(Screen.Project.createRoute(projectId))
-                }
+                },
+                onThemeChanged = onThemeChanged
             )
         }
         

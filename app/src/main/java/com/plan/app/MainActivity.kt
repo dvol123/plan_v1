@@ -9,7 +9,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.plan.app.presentation.navigation.AppNavigation
 import com.plan.app.presentation.theme.PlanTheme
@@ -24,9 +24,9 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
     
     override fun attachBaseContext(newBase: Context) {
-        // Apply saved locale before activity is created
+        // Apply saved locale before activity is created - Russian by default
         val prefs = newBase.getSharedPreferences("plan_app_prefs", Context.MODE_PRIVATE)
-        val languageCode = prefs.getString("selected_language", "en") ?: "en"
+        val languageCode = prefs.getString("selected_language", "ru") ?: "ru"
         
         val locale = when (languageCode) {
             "ru" -> Locale("ru")
@@ -42,11 +42,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
-        // Get saved theme preference
-        val savedTheme = AppPreferences.getTheme(this)
-        
         setContent {
-            val darkTheme = when (savedTheme) {
+            // Observe theme changes
+            var themeMode by remember { mutableIntStateOf(AppPreferences.getTheme(this@MainActivity)) }
+            
+            val darkTheme = when (themeMode) {
                 1 -> false // Light
                 2 -> true  // Dark
                 else -> isSystemInDarkTheme() // System default
@@ -57,7 +57,11 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavigation()
+                    AppNavigation(
+                        onThemeChanged = { newThemeMode ->
+                            themeMode = newThemeMode
+                        }
+                    )
                 }
             }
         }

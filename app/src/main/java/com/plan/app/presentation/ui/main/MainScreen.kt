@@ -49,7 +49,8 @@ import java.io.File
 @Composable
 fun MainScreen(
     onProjectClick: (Long) -> Unit,
-    viewModel: MainViewModel = hiltViewModel()
+    viewModel: MainViewModel = hiltViewModel(),
+    onThemeChanged: (Int) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val projects by viewModel.projects.collectAsStateWithLifecycle()
@@ -63,6 +64,7 @@ fun MainScreen(
     var showCameraPermissionDenied by remember { mutableStateOf(false) }
     var showViewDialog by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var showShareDialog by remember { mutableStateOf(false) }
     
     // Camera launcher - must be declared before cameraPermissionLauncher
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -193,6 +195,39 @@ fun MainScreen(
         }
     }
     
+    // Share all launcher - shares all projects
+    val shareAllLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri: Uri? ->
+        uri?.let {
+            val tempFile = File(context.cacheDir, "share_all_temp.zip")
+            viewModel.exportAllProjectsToZip(tempFile) { success, error ->
+                if (success) {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        tempFile.inputStream().use { input ->
+                            input.copyTo(output)
+                        }
+                    }
+                    // Create share intent
+                    val shareUri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        tempFile
+                    )
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/zip"
+                        putExtra(Intent.EXTRA_STREAM, shareUri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share)))
+                } else {
+                    Toast.makeText(context, error ?: context.getString(R.string.export_error), Toast.LENGTH_SHORT).show()
+                }
+                tempFile.delete()
+            }
+        }
+    }
+    
     // Filter projects based on search query
     val filteredProjects = remember(projects, uiState.searchQuery) {
         if (uiState.searchQuery.isBlank()) {
@@ -245,6 +280,41 @@ fun MainScreen(
             dismissButton = {
                 TextButton(onClick = { showExportDialog = false }) {
                     Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+    
+    // Share dialog
+    if (showShareDialog) {
+        AlertDialog(
+            onDismissRequest = { showShareDialog = false },
+            title = { Text(stringResource(R.string.share)) },
+            text = { Text("Choose what to share") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showShareDialog = false
+                    if (uiState.selectedProject != null) {
+                        shareLauncher.launch("${uiState.selectedProject!!.name}_share.zip")
+                    } else {
+                        Toast.makeText(context, "Select a project first", Toast.LENGTH_SHORT).show()
+                    }
+                }) {
+                    Text(if (uiState.selectedProject != null) "Share selected" else "Select project first")
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { showShareDialog = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    // Share all button
+                    TextButton(onClick = {
+                        showShareDialog = false
+                        shareAllLauncher.launch("all_projects_share.zip")
+                    }) {
+                        Text("Share all")
+                    }
                 }
             }
         )
@@ -331,12 +401,8 @@ fun MainScreen(
                         DropdownMenuItem(
                             onClick = {
                                 showMenu = false
-                                // Share - export and share
-                                if (uiState.selectedProject != null) {
-                                    shareLauncher.launch("${uiState.selectedProject!!.name}_share.zip")
-                                } else {
-                                    Toast.makeText(context, "Select a project to share", Toast.LENGTH_SHORT).show()
-                                }
+                                // Show share dialog
+                                showShareDialog = true
                             },
                             text = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -576,7 +642,8 @@ fun MainScreen(
     // Settings Dialog
     if (uiState.showSettingsDialog) {
         SettingsDialog(
-            onDismiss = { viewModel.hideSettingsDialog() }
+            onDismiss = { viewModel.hideSettingsDialog() },
+            onThemeChanged = onThemeChanged
         )
     }
     

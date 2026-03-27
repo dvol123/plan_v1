@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -848,13 +849,6 @@ private fun FullscreenMediaViewer(
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
     
-    // Reset zoom when changing media
-    LaunchedEffect(currentIndex) {
-        scale = 1f
-        offsetX = 0f
-        offsetY = 0f
-    }
-    
     // Safe release function for ExoPlayer
     fun safeReleasePlayer() {
         try {
@@ -866,6 +860,16 @@ private fun FullscreenMediaViewer(
         } catch (e: Exception) {
             android.util.Log.e("FullscreenMediaViewer", "Error releasing ExoPlayer", e)
         }
+    }
+    
+    // Handle media change - reset zoom and release video player
+    LaunchedEffect(currentIndex) {
+        // Reset zoom
+        scale = 1f
+        offsetX = 0f
+        offsetY = 0f
+        // Stop and release video player when changing media
+        safeReleasePlayer()
     }
     
     // Lifecycle awareness for ExoPlayer - pause when app goes to background
@@ -903,18 +907,6 @@ private fun FullscreenMediaViewer(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
-                .pointerInput(mediaContents.size) {
-                    // Swipe gesture for navigation
-                    detectHorizontalDragGestures { _, dragAmount ->
-                        if (scale == 1f) { // Only swipe when not zoomed
-                            if (dragAmount < -100 && currentIndex < mediaContents.size - 1) {
-                                currentIndex++
-                            } else if (dragAmount > 100 && currentIndex > 0) {
-                                currentIndex--
-                            }
-                        }
-                    }
-                }
         ) {
             // Close button
             IconButton(
@@ -922,7 +914,7 @@ private fun FullscreenMediaViewer(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(16.dp)
-                    .zIndex(1f)
+                    .zIndex(2f)
                     .background(Color.Black.copy(alpha = 0.5f), CircleShape)
             ) {
                 Icon(
@@ -936,46 +928,30 @@ private fun FullscreenMediaViewer(
             // Media content
             when (content.type) {
                 ContentType.PHOTO -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectTransformGestures { _, pan, zoom, _ ->
-                                    scale = max(0.5f, min(5f, scale * zoom))
-                                    
-                                    val maxOffsetX = (size.width * (scale - 1) / 2)
-                                    val maxOffsetY = (size.height * (scale - 1) / 2)
-                                    
-                                    offsetX = max(-maxOffsetX, min(maxOffsetX, offsetX + pan.x))
-                                    offsetY = max(-maxOffsetY, min(maxOffsetY, offsetY + pan.y))
-                                }
-                            }
-                    ) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(content.data)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = "Photo",
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer(
-                                    scaleX = scale,
-                                    scaleY = scale,
-                                    translationX = offsetX,
-                                    translationY = offsetY
-                                ),
-                            contentScale = ContentScale.Fit
-                        )
-                    }
+                    ZoomablePhoto(
+                        contentData = content.data,
+                        scale = scale,
+                        offsetX = offsetX,
+                        offsetY = offsetY,
+                        onScaleChange = { scale = it },
+                        onOffsetChange = { x, y -> offsetX = x; offsetY = y },
+                        onSwipeLeft = {
+                            if (currentIndex < mediaContents.size - 1) currentIndex++
+                        },
+                        onSwipeRight = {
+                            if (currentIndex > 0) currentIndex--
+                        },
+                        onDoubleTap = {
+                            // Reset zoom on double tap
+                            scale = 1f
+                            offsetX = 0f
+                            offsetY = 0f
+                        }
+                    )
                 }
                 ContentType.VIDEO -> {
-                    // Initialize ExoPlayer safely
+                    // Initialize ExoPlayer
                     LaunchedEffect(content.data) {
-                        // Release previous player safely
-                        safeReleasePlayer()
-                        
-                        // Create new player with error handling
                         try {
                             exoPlayer = ExoPlayer.Builder(context).build().apply {
                                 val mediaItem = androidx.media3.common.MediaItem.fromUri(content.data)
@@ -1014,11 +990,15 @@ private fun FullscreenMediaViewer(
                 // Previous button
                 if (currentIndex > 0) {
                     IconButton(
-                        onClick = { currentIndex-- },
+                        onClick = { 
+                            // Stop video before changing
+                            safeReleasePlayer()
+                            currentIndex-- 
+                        },
                         modifier = Modifier
                             .align(Alignment.CenterStart)
                             .padding(16.dp)
-                            .zIndex(1f)
+                            .zIndex(2f)
                             .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                     ) {
                         Icon(
@@ -1033,11 +1013,15 @@ private fun FullscreenMediaViewer(
                 // Next button
                 if (currentIndex < mediaContents.size - 1) {
                     IconButton(
-                        onClick = { currentIndex++ },
+                        onClick = { 
+                            // Stop video before changing
+                            safeReleasePlayer()
+                            currentIndex++ 
+                        },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .padding(16.dp)
-                            .zIndex(1f)
+                            .zIndex(2f)
                             .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                     ) {
                         Icon(
@@ -1056,11 +1040,102 @@ private fun FullscreenMediaViewer(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(16.dp)
-                        .zIndex(1f)
+                        .zIndex(2f)
                         .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
                         .padding(horizontal = 12.dp, vertical = 4.dp)
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ZoomablePhoto(
+    contentData: String,
+    scale: Float,
+    offsetX: Float,
+    offsetY: Float,
+    onScaleChange: (Float) -> Unit,
+    onOffsetChange: (Float, Float) -> Unit,
+    onSwipeLeft: () -> Unit,
+    onSwipeRight: () -> Unit,
+    onDoubleTap: () -> Unit
+) {
+    val context = LocalContext.current
+    
+    // Track drag for swipe detection
+    var totalDragX by remember { mutableFloatStateOf(0f) }
+    var isDragging by remember { mutableStateOf(false) }
+    
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                // Combined gesture detection
+                detectTransformGestures(
+                    onGesture = { _, pan, zoom, _ ->
+                        isDragging = true
+                        
+                        // Handle zoom
+                        val newScale = max(0.5f, min(5f, scale * zoom))
+                        onScaleChange(newScale)
+                        
+                        // Handle pan
+                        val maxOffsetX = (size.width * (newScale - 1) / 2)
+                        val maxOffsetY = (size.height * (newScale - 1) / 2)
+                        
+                        onOffsetChange(
+                            max(-maxOffsetX, min(maxOffsetX, offsetX + pan.x)),
+                            max(-maxOffsetY, min(maxOffsetY, offsetY + pan.y))
+                        )
+                        
+                        // Track horizontal drag for swipe (only when not zoomed)
+                        if (scale == 1f && newScale == 1f) {
+                            totalDragX += pan.x
+                        }
+                    }
+                )
+            }
+            .pointerInput(Unit) {
+                // Double tap to reset zoom
+                detectTapGestures(
+                    onDoubleTap = {
+                        onDoubleTap()
+                    },
+                    onTap = {
+                        // Reset drag tracking on tap
+                        totalDragX = 0f
+                    }
+                )
+            }
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(contentData)
+                .crossfade(true)
+                .build(),
+            contentDescription = "Photo",
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offsetX,
+                    translationY = offsetY
+                ),
+            contentScale = ContentScale.Fit
+        )
+    }
+    
+    // Handle swipe after gesture ends
+    LaunchedEffect(isDragging) {
+        if (!isDragging && scale == 1f) {
+            if (totalDragX < -150) {
+                onSwipeLeft()
+            } else if (totalDragX > 150) {
+                onSwipeRight()
+            }
+            totalDragX = 0f
         }
     }
 }

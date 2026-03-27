@@ -261,6 +261,29 @@ class MainViewModel @Inject constructor(
         }
     }
     
+    // Export all projects to ZIP (for sharing)
+    fun exportAllProjectsToZip(outputFile: File, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val result = exportManager.exportAllProjects(outputFile)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = result.success,
+                    exportMessage = if (result.success) "Export successful" else result.error
+                )
+                onComplete(result.success, result.error)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    exportSuccess = false,
+                    exportMessage = e.message
+                )
+                onComplete(false, e.message)
+            }
+        }
+    }
+    
     // Export all projects as HTML reports in ZIP (for viewing on PC)
     fun exportAllProjectsForPC(outputFile: File, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
         viewModelScope.launch {

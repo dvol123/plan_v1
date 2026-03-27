@@ -40,7 +40,7 @@ object AppPreferences {
     
     fun getLanguage(context: Context): String {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_LANGUAGE, "en") ?: "en"
+            .getString(KEY_LANGUAGE, "ru") ?: "ru" // Russian by default
     }
     
     fun saveTheme(context: Context, themeMode: Int) {
@@ -83,20 +83,18 @@ fun applyLanguage(context: Context, languageCode: String): Context {
  */
 @Composable
 fun SettingsDialog(
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onThemeChanged: (Int) -> Unit = {} // Callback for theme change
 ) {
     val context = LocalContext.current
+    val activity = context as? Activity
     
-    // Get current saved language
+    // Get current saved language and theme
     val savedLanguageCode = remember { AppPreferences.getLanguage(context) }
     val savedTheme = remember { AppPreferences.getTheme(context) }
     
-    var selectedLanguage by remember { mutableStateOf(AppLanguage.entries.find { it.code == savedLanguageCode } ?: AppLanguage.ENGLISH) }
+    var selectedLanguage by remember { mutableStateOf(AppLanguage.entries.find { it.code == savedLanguageCode } ?: AppLanguage.RUSSIAN) }
     var selectedTheme by remember { mutableStateOf(savedTheme) }
-    var showRestartMessage by remember { mutableStateOf(false) }
-    var themeChanged by remember { mutableStateOf(false) }
-    
-    val activity = LocalContext.current as? Activity
     
     val languages = AppLanguage.entries
     
@@ -106,111 +104,86 @@ fun SettingsDialog(
         2 to stringResource(R.string.theme_dark)
     )
     
-    // Show restart message when language or theme is changed
-    if (showRestartMessage) {
-        AlertDialog(
-            onDismissRequest = { 
-                showRestartMessage = false
-                if (themeChanged) {
-                    activity?.recreate()
-                }
-                onDismiss()
-            },
-            title = { Text(stringResource(R.string.settings)) },
-            text = { Text(stringResource(R.string.restart_required)) },
-            confirmButton = {
-                TextButton(onClick = { 
-                    showRestartMessage = false
-                    if (themeChanged) {
-                        activity?.recreate()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings)) },
+        text = {
+            Column {
+                // Language selection
+                Text(
+                    text = stringResource(R.string.language),
+                    style = MaterialTheme.typography.titleSmall
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                languages.forEach { language ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        RadioButton(
+                            selected = selectedLanguage == language,
+                            onClick = { 
+                                if (selectedLanguage != language) {
+                                    selectedLanguage = language
+                                    AppPreferences.saveLanguage(context, language.code)
+                                    // Auto restart for language change
+                                    activity?.recreate()
+                                }
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = language.displayName,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(top = 12.dp)
+                        )
                     }
-                    onDismiss()
-                }) {
-                    Text(stringResource(R.string.ok))
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Theme selection
+                Text(
+                    text = stringResource(R.string.theme),
+                    style = MaterialTheme.typography.titleSmall
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                themes.forEach { (themeMode, themeName) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        RadioButton(
+                            selected = selectedTheme == themeMode,
+                            onClick = { 
+                                if (selectedTheme != themeMode) {
+                                    selectedTheme = themeMode
+                                    AppPreferences.saveTheme(context, themeMode)
+                                    // Apply theme immediately via callback
+                                    onThemeChanged(themeMode)
+                                }
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = themeName,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(top = 12.dp)
+                        )
+                    }
                 }
             }
-        )
-    } else {
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.settings)) },
-            text = {
-                Column {
-                    // Language selection
-                    Text(
-                        text = stringResource(R.string.language),
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    languages.forEach { language ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                        ) {
-                            RadioButton(
-                                selected = selectedLanguage == language,
-                                onClick = { 
-                                    if (selectedLanguage != language) {
-                                        selectedLanguage = language
-                                        AppPreferences.saveLanguage(context, language.code)
-                                        showRestartMessage = true
-                                    }
-                                }
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = language.displayName,
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.padding(top = 12.dp)
-                            )
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    // Theme selection
-                    Text(
-                        text = stringResource(R.string.theme),
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    themes.forEach { (themeMode, themeName) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                        ) {
-                            RadioButton(
-                                selected = selectedTheme == themeMode,
-                                onClick = { 
-                                    if (selectedTheme != themeMode) {
-                                        selectedTheme = themeMode
-                                        AppPreferences.saveTheme(context, themeMode)
-                                        themeChanged = true
-                                        showRestartMessage = true
-                                    }
-                                }
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = themeName,
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.padding(top = 12.dp)
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.ok))
-                }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.ok))
             }
-        )
-    }
+        }
+    )
 }
