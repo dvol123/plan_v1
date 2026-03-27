@@ -1051,17 +1051,47 @@ private fun FullscreenMediaViewer(
 
 /**
  * Load bitmap with correct orientation from EXIF data
+ * Handles both local file paths and content:// URIs
  */
-private fun loadBitmapWithCorrectOrientation(uri: Uri, context: android.content.Context): Bitmap? {
+private fun loadBitmapWithCorrectOrientation(pathOrUri: String, context: android.content.Context): Bitmap? {
     return try {
-        val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-        val bitmap = BitmapFactory.decodeStream(inputStream)
-        inputStream?.close()
+        val inputStream: InputStream = if (pathOrUri.startsWith("/")) {
+            // Local file path
+            java.io.FileInputStream(pathOrUri)
+        } else if (pathOrUri.startsWith("content://")) {
+            // Content URI
+            context.contentResolver.openInputStream(Uri.parse(pathOrUri))!!
+        } else if (pathOrUri.startsWith("file://")) {
+            // File URI
+            java.io.FileInputStream(Uri.parse(pathOrUri).path ?: pathOrUri.substring(7))
+        } else {
+            // Try as local path first, then as URI
+            val file = File(pathOrUri)
+            if (file.exists()) {
+                java.io.FileInputStream(pathOrUri)
+            } else {
+                context.contentResolver.openInputStream(Uri.parse(pathOrUri))!!
+            }
+        }
         
-        // Read EXIF orientation
-        val exifInputStream = context.contentResolver.openInputStream(uri)
-        val exif = exifInputStream?.let { ExifInterface(it) }
-        exifInputStream?.close()
+        val bitmap = BitmapFactory.decodeStream(inputStream)
+        inputStream.close()
+        
+        // Read EXIF orientation - use file path directly for ExifInterface
+        val exif = if (pathOrUri.startsWith("/") || File(pathOrUri).exists()) {
+            ExifInterface(pathOrUri)
+        } else if (pathOrUri.startsWith("file://")) {
+            ExifInterface(Uri.parse(pathOrUri).path ?: pathOrUri.substring(7))
+        } else {
+            // For content:// URIs, we need to copy to temp file to read EXIF
+            // This is a limitation - content URIs don't support direct EXIF reading
+            val exifInputStream = if (pathOrUri.startsWith("content://")) {
+                context.contentResolver.openInputStream(Uri.parse(pathOrUri))
+            } else {
+                null
+            }
+            exifInputStream?.use { ExifInterface(it) }
+        }
         
         val orientation = exif?.getAttributeInt(
             ExifInterface.TAG_ORIENTATION,
@@ -1164,8 +1194,7 @@ private fun ZoomablePhoto(
         
         LaunchedEffect(contentData) {
             try {
-                val uri = Uri.parse(contentData)
-                bitmapState.value = loadBitmapWithCorrectOrientation(uri, context)
+                bitmapState.value = loadBitmapWithCorrectOrientation(contentData, context)
             } catch (e: Exception) {
                 android.util.Log.e("ZoomablePhoto", "Error loading image", e)
                 bitmapState.value = null
