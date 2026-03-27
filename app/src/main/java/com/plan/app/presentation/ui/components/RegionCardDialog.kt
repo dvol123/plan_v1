@@ -2,22 +2,28 @@ package com.plan.app.presentation.ui.components
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,18 +38,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toIntSize
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.exoplayer.ExoPlayer
@@ -57,6 +67,7 @@ import com.plan.app.domain.model.ContentType
 import com.plan.app.domain.model.Region
 import com.plan.app.domain.model.State
 import java.io.File
+import java.io.InputStream
 import kotlin.math.max
 import kotlin.math.min
 
@@ -836,18 +847,21 @@ private fun FullscreenMediaViewer(
     initialIndex: Int,
     onDismiss: () -> Unit
 ) {
-    var currentIndex by remember { mutableIntStateOf(initialIndex) }
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    
+    // Pager state for swipe between photos
+    val pagerState = rememberPagerState(
+        initialPage = initialIndex,
+        pageCount = { mediaContents.size }
+    )
+    
+    // Current content based on pager
+    val currentIndex = pagerState.currentPage
     val content = mediaContents.getOrNull(currentIndex) ?: return
     
     // Video player state
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
-    
-    // Zoom state for photos
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
     
     // Safe release function for ExoPlayer
     fun safeReleasePlayer() {
@@ -862,25 +876,17 @@ private fun FullscreenMediaViewer(
         }
     }
     
-    // Handle media change - reset zoom and release video player
+    // Release video player when page changes
     LaunchedEffect(currentIndex) {
-        // Reset zoom
-        scale = 1f
-        offsetX = 0f
-        offsetY = 0f
-        // Stop and release video player when changing media
         safeReleasePlayer()
     }
     
-    // Lifecycle awareness for ExoPlayer - pause when app goes to background
+    // Lifecycle awareness for ExoPlayer
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> {
                     try { exoPlayer?.pause() } catch (_: Exception) {}
-                }
-                Lifecycle.Event.ON_RESUME -> {
-                    // Don't auto-resume, let user control playback
                 }
                 Lifecycle.Event.ON_STOP -> {
                     try { exoPlayer?.pause() } catch (_: Exception) {}
@@ -925,63 +931,59 @@ private fun FullscreenMediaViewer(
                 )
             }
             
-            // Media content
-            when (content.type) {
-                ContentType.PHOTO -> {
-                    ZoomablePhoto(
-                        contentData = content.data,
-                        scale = scale,
-                        offsetX = offsetX,
-                        offsetY = offsetY,
-                        onScaleChange = { scale = it },
-                        onOffsetChange = { x, y -> offsetX = x; offsetY = y },
-                        onSwipeLeft = {
-                            if (currentIndex < mediaContents.size - 1) currentIndex++
-                        },
-                        onSwipeRight = {
-                            if (currentIndex > 0) currentIndex--
-                        },
-                        onDoubleTap = {
-                            // Reset zoom on double tap
-                            scale = 1f
-                            offsetX = 0f
-                            offsetY = 0f
-                        }
-                    )
-                }
-                ContentType.VIDEO -> {
-                    // Initialize ExoPlayer
-                    LaunchedEffect(content.data) {
-                        try {
-                            exoPlayer = ExoPlayer.Builder(context).build().apply {
-                                val mediaItem = androidx.media3.common.MediaItem.fromUri(content.data)
-                                setMediaItem(mediaItem)
-                                prepare()
-                                playWhenReady = true
-                            }
-                        } catch (e: Exception) {
-                            android.util.Log.e("FullscreenMediaViewer", "Error creating ExoPlayer", e)
-                            exoPlayer = null
-                        }
-                    }
-                    
-                    exoPlayer?.let { player ->
-                        AndroidView(
-                            factory = {
-                                PlayerView(it).apply {
-                                    this.player = player
-                                    layoutParams = FrameLayout.LayoutParams(
-                                        ViewGroup.LayoutParams.MATCH_PARENT,
-                                        ViewGroup.LayoutParams.MATCH_PARENT
-                                    )
-                                }
-                            },
-                            modifier = Modifier.fillMaxSize()
+            // HorizontalPager for swipe between media
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                val pageContent = mediaContents.getOrNull(page)
+                
+                when (pageContent?.type) {
+                    ContentType.PHOTO -> {
+                        ZoomablePhoto(
+                            contentData = pageContent.data
                         )
                     }
-                }
-                ContentType.TEXT -> {
-                    // Not shown in fullscreen
+                    ContentType.VIDEO -> {
+                        // Initialize ExoPlayer for this video
+                        val videoExoPlayer by remember(pageContent.data) {
+                            mutableStateOf<ExoPlayer?>(null)
+                        }
+                        
+                        LaunchedEffect(pageContent.data) {
+                            try {
+                                exoPlayer = ExoPlayer.Builder(context).build().apply {
+                                    val mediaItem = androidx.media3.common.MediaItem.fromUri(pageContent.data)
+                                    setMediaItem(mediaItem)
+                                    prepare()
+                                    playWhenReady = true
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.e("FullscreenMediaViewer", "Error creating ExoPlayer", e)
+                            }
+                        }
+                        
+                        exoPlayer?.let { player ->
+                            AndroidView(
+                                factory = {
+                                    PlayerView(it).apply {
+                                        this.player = player
+                                        layoutParams = FrameLayout.LayoutParams(
+                                            ViewGroup.LayoutParams.MATCH_PARENT,
+                                            ViewGroup.LayoutParams.MATCH_PARENT
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                    ContentType.TEXT -> {
+                        // Not shown in fullscreen
+                    }
+                    null -> {
+                        // Empty
+                    }
                 }
             }
             
@@ -991,9 +993,8 @@ private fun FullscreenMediaViewer(
                 if (currentIndex > 0) {
                     IconButton(
                         onClick = { 
-                            // Stop video before changing
                             safeReleasePlayer()
-                            currentIndex-- 
+                            // Will be handled by pager
                         },
                         modifier = Modifier
                             .align(Alignment.CenterStart)
@@ -1014,9 +1015,8 @@ private fun FullscreenMediaViewer(
                 if (currentIndex < mediaContents.size - 1) {
                     IconButton(
                         onClick = { 
-                            // Stop video before changing
                             safeReleasePlayer()
-                            currentIndex++ 
+                            // Will be handled by pager
                         },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
@@ -1049,93 +1049,163 @@ private fun FullscreenMediaViewer(
     }
 }
 
+/**
+ * Load bitmap with correct orientation from EXIF data
+ */
+private fun loadBitmapWithCorrectOrientation(uri: Uri, context: android.content.Context): Bitmap? {
+    return try {
+        val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
+        val bitmap = BitmapFactory.decodeStream(inputStream)
+        inputStream?.close()
+        
+        // Read EXIF orientation
+        val exifInputStream = context.contentResolver.openInputStream(uri)
+        val exif = exifInputStream?.let { ExifInterface(it) }
+        exifInputStream?.close()
+        
+        val orientation = exif?.getAttributeInt(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.ORIENTATION_NORMAL
+        ) ?: ExifInterface.ORIENTATION_NORMAL
+        
+        val rotation = when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> 0f
+        }
+        
+        if (rotation != 0f && bitmap != null) {
+            val matrix = Matrix()
+            matrix.postRotate(rotation)
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        } else {
+            bitmap
+        }
+    } catch (e: Exception) {
+        android.util.Log.e("ZoomablePhoto", "Error loading bitmap with orientation", e)
+        null
+    }
+}
+
 @Composable
 private fun ZoomablePhoto(
-    contentData: String,
-    scale: Float,
-    offsetX: Float,
-    offsetY: Float,
-    onScaleChange: (Float) -> Unit,
-    onOffsetChange: (Float, Float) -> Unit,
-    onSwipeLeft: () -> Unit,
-    onSwipeRight: () -> Unit,
-    onDoubleTap: () -> Unit
+    contentData: String
 ) {
     val context = LocalContext.current
     
-    // Track drag for swipe detection
-    var totalDragX by remember { mutableFloatStateOf(0f) }
-    var isDragging by remember { mutableStateOf(false) }
+    // Zoom and pan state
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+    
+    // Container size for boundary checks
+    var containerSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
+    
+    // Reset zoom when content changes
+    LaunchedEffect(contentData) {
+        scale = 1f
+        offsetX = 0f
+        offsetY = 0f
+    }
+    
+    // Transformable state for pinch zoom
+    val transformableState = rememberTransformableState { zoomChange, panChange, _ ->
+        // Update scale with limits
+        val newScale = (scale * zoomChange).coerceIn(0.5f, 5f)
+        
+        // Only allow panning when zoomed in
+        if (newScale > 1f) {
+            val maxOffsetX = (containerSize.width * (newScale - 1) / 2f)
+            val maxOffsetY = (containerSize.height * (newScale - 1) / 2f)
+            
+            offsetX = (offsetX + panChange.x * newScale).coerceIn(-maxOffsetX, maxOffsetX)
+            offsetY = (offsetY + panChange.y * newScale).coerceIn(-maxOffsetY, maxOffsetY)
+        } else {
+            offsetX = 0f
+            offsetY = 0f
+        }
+        
+        scale = newScale
+    }
     
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .onSizeChanged { containerSize = it }
+            .transformable(state = transformableState)
             .pointerInput(Unit) {
-                // Combined gesture detection
-                detectTransformGestures(
-                    onGesture = { _, pan, zoom, _ ->
-                        isDragging = true
-                        
-                        // Handle zoom
-                        val newScale = max(0.5f, min(5f, scale * zoom))
-                        onScaleChange(newScale)
-                        
-                        // Handle pan
-                        val maxOffsetX = (size.width * (newScale - 1) / 2)
-                        val maxOffsetY = (size.height * (newScale - 1) / 2)
-                        
-                        onOffsetChange(
-                            max(-maxOffsetX, min(maxOffsetX, offsetX + pan.x)),
-                            max(-maxOffsetY, min(maxOffsetY, offsetY + pan.y))
-                        )
-                        
-                        // Track horizontal drag for swipe (only when not zoomed)
-                        if (scale == 1f && newScale == 1f) {
-                            totalDragX += pan.x
+                detectTapGestures(
+                    onDoubleTap = { tapOffset ->
+                        // Toggle between 1x and 2x zoom on double tap
+                        if (scale > 1.5f) {
+                            // Reset to 1x
+                            scale = 1f
+                            offsetX = 0f
+                            offsetY = 0f
+                        } else {
+                            // Zoom to 2x centered on tap point
+                            scale = 2f
+                            // Center the zoom on the tap point
+                            val centerX = containerSize.width / 2f
+                            val centerY = containerSize.height / 2f
+                            offsetX = (centerX - tapOffset.x).coerceIn(-containerSize.width / 2f, containerSize.width / 2f)
+                            offsetY = (centerY - tapOffset.y).coerceIn(-containerSize.height / 2f, containerSize.height / 2f)
                         }
                     }
                 )
-            }
-            .pointerInput(Unit) {
-                // Double tap to reset zoom
-                detectTapGestures(
-                    onDoubleTap = {
-                        onDoubleTap()
-                    },
-                    onTap = {
-                        // Reset drag tracking on tap
-                        totalDragX = 0f
-                    }
-                )
-            }
+            },
+        contentAlignment = Alignment.Center
     ) {
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(contentData)
-                .crossfade(true)
-                .build(),
-            contentDescription = "Photo",
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer(
-                    scaleX = scale,
-                    scaleY = scale,
-                    translationX = offsetX,
-                    translationY = offsetY
-                ),
-            contentScale = ContentScale.Fit
-        )
-    }
-    
-    // Handle swipe after gesture ends
-    LaunchedEffect(isDragging) {
-        if (!isDragging && scale == 1f) {
-            if (totalDragX < -150) {
-                onSwipeLeft()
-            } else if (totalDragX > 150) {
-                onSwipeRight()
+        // Load image with correct orientation
+        val bitmapState = remember(contentData) {
+            mutableStateOf<Bitmap?>(null)
+        }
+        
+        LaunchedEffect(contentData) {
+            try {
+                val uri = Uri.parse(contentData)
+                bitmapState.value = loadBitmapWithCorrectOrientation(uri, context)
+            } catch (e: Exception) {
+                android.util.Log.e("ZoomablePhoto", "Error loading image", e)
+                bitmapState.value = null
             }
-            totalDragX = 0f
+        }
+        
+        val bitmap = bitmapState.value
+        
+        if (bitmap != null) {
+            androidx.compose.foundation.Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "Photo",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offsetX,
+                        translationY = offsetY
+                    ),
+                contentScale = ContentScale.Fit
+            )
+        } else {
+            // Fallback to AsyncImage if bitmap loading fails
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(contentData)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "Photo",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offsetX,
+                        translationY = offsetY
+                    ),
+                contentScale = ContentScale.Fit
+            )
         }
     }
 }
