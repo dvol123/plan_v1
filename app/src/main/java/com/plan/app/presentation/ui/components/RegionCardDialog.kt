@@ -2,9 +2,6 @@ package com.plan.app.presentation.ui.components
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import android.net.Uri
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -12,10 +9,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -31,35 +24,26 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.Lifecycle
-import kotlin.math.pow
-import kotlin.math.sqrt
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.compose.ui.viewinterop.AndroidView
+import me.saket.telephoto.zoomable.ZoomableAsyncImage
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.plan.app.R
@@ -985,261 +969,26 @@ private fun FullscreenMediaViewer(
     }
 }
 
-/**
- * Load bitmap with correct orientation from EXIF data
- * Handles both local file paths and content:// URIs
- */
-private fun loadBitmapWithCorrectOrientation(pathOrUri: String, context: android.content.Context): Bitmap? {
-    return try {
-        val inputStream: InputStream = if (pathOrUri.startsWith("/")) {
-            // Local file path
-            java.io.FileInputStream(pathOrUri)
-        } else if (pathOrUri.startsWith("content://")) {
-            // Content URI
-            context.contentResolver.openInputStream(Uri.parse(pathOrUri))!!
-        } else if (pathOrUri.startsWith("file://")) {
-            // File URI
-            java.io.FileInputStream(Uri.parse(pathOrUri).path ?: pathOrUri.substring(7))
-        } else {
-            // Try as local path first, then as URI
-            val file = File(pathOrUri)
-            if (file.exists()) {
-                java.io.FileInputStream(pathOrUri)
-            } else {
-                context.contentResolver.openInputStream(Uri.parse(pathOrUri))!!
-            }
-        }
-        
-        val bitmap = BitmapFactory.decodeStream(inputStream)
-        inputStream.close()
-        
-        // Read EXIF orientation - use file path directly for ExifInterface
-        val exif = if (pathOrUri.startsWith("/") || File(pathOrUri).exists()) {
-            ExifInterface(pathOrUri)
-        } else if (pathOrUri.startsWith("file://")) {
-            ExifInterface(Uri.parse(pathOrUri).path ?: pathOrUri.substring(7))
-        } else {
-            // For content:// URIs, we need to copy to temp file to read EXIF
-            // This is a limitation - content URIs don't support direct EXIF reading
-            val exifInputStream = if (pathOrUri.startsWith("content://")) {
-                context.contentResolver.openInputStream(Uri.parse(pathOrUri))
-            } else {
-                null
-            }
-            exifInputStream?.use { ExifInterface(it) }
-        }
-        
-        val orientation = exif?.getAttributeInt(
-            ExifInterface.TAG_ORIENTATION,
-            ExifInterface.ORIENTATION_NORMAL
-        ) ?: ExifInterface.ORIENTATION_NORMAL
-        
-        val rotation = when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-            else -> 0f
-        }
-        
-        if (rotation != 0f && bitmap != null) {
-            val matrix = Matrix()
-            matrix.postRotate(rotation)
-            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-        } else {
-            bitmap
-        }
-    } catch (e: Exception) {
-        android.util.Log.e("ZoomablePhoto", "Error loading bitmap with orientation", e)
-        null
-    }
-}
-
 @Composable
 private fun ZoomablePhoto(
     contentData: String
 ) {
     val context = LocalContext.current
     
-    // Zoom and pan state
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
-    
-    // Container size for boundary checks
-    var containerSize by remember { mutableStateOf(IntSize.Zero) }
-    
-    // For pinch gesture detection
-    var previousDistance by remember { mutableFloatStateOf(0f) }
-    
-    // Reset zoom when content changes
-    LaunchedEffect(contentData) {
-        scale = 1f
-        offsetX = 0f
-        offsetY = 0f
-    }
-    
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .onSizeChanged { containerSize = it }
-            // Only handle gestures when zoomed in - let HorizontalPager handle swipe when not zoomed
-            .then(
-                if (scale > 1f) {
-                    Modifier.pointerInput(Unit) {
-                        detectTransformGestures { centroid, pan, zoom, _ ->
-                            val newScale = (scale * zoom).coerceIn(1f, 5f)
-                            
-                            if (newScale > 1f) {
-                                val maxOffsetX = (containerSize.width * (newScale - 1) / 2f)
-                                val maxOffsetY = (containerSize.height * (newScale - 1) / 2f)
-                                
-                                offsetX = (offsetX + pan.x).coerceIn(-maxOffsetX, maxOffsetX)
-                                offsetY = (offsetY + pan.y).coerceIn(-maxOffsetY, maxOffsetY)
-                            }
-                            
-                            scale = newScale
-                            
-                            if (scale <= 1f) {
-                                scale = 1f
-                                offsetX = 0f
-                                offsetY = 0f
-                            }
-                        }
-                    }
-                } else {
-                    // When not zoomed, only handle pinch-to-zoom and double-tap
-                    Modifier.pointerInput(Unit) {
-                        detectTapGestures(
-                            onDoubleTap = { tapOffset ->
-                                // Zoom to 2x centered on tap point
-                                scale = 2f
-                                val centerX = containerSize.width / 2f
-                                val centerY = containerSize.height / 2f
-                                offsetX = (centerX - tapOffset.x).coerceIn(-containerSize.width / 2f, containerSize.width / 2f)
-                                offsetY = (centerY - tapOffset.y).coerceIn(-containerSize.height / 2f, containerSize.height / 2f)
-                            }
-                        )
-                    }
-                        .pointerInput(Unit) {
-                            // Pinch to zoom when not zoomed - use awaitPointerEventScope for low-level control
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    
-                                    if (event.changes.size == 2) {
-                                        // Two fingers = pinch gesture
-                                        val finger1 = event.changes[0]
-                                        val finger2 = event.changes[1]
-                                        
-                                        val currentDistance = sqrt(
-                                            (finger1.position.x - finger2.position.x).pow(2) +
-                                            (finger1.position.y - finger2.position.y).pow(2)
-                                        )
-                                        
-                                        if (previousDistance > 0 && currentDistance > 0) {
-                                            val zoomFactor = currentDistance / previousDistance
-                                            
-                                            if (zoomFactor > 1.05f || zoomFactor < 0.95f) {
-                                                // Significant zoom change
-                                                val newScale = (scale * zoomFactor).coerceIn(1f, 5f)
-                                                
-                                                if (newScale > 1.1f) {
-                                                    // Start zooming
-                                                    scale = newScale
-                                                    
-                                                    // Calculate centroid
-                                                    val centroidX = (finger1.position.x + finger2.position.x) / 2f
-                                                    val centroidY = (finger1.position.y + finger2.position.y) / 2f
-                                                    val centerX = containerSize.width / 2f
-                                                    val centerY = containerSize.height / 2f
-                                                    offsetX = (centerX - centroidX) * (newScale - 1) / newScale
-                                                    offsetY = (centerY - centroidY) * (newScale - 1) / newScale
-                                                    
-                                                    // Consume events to prevent pager from swiping
-                                                    finger1.consume()
-                                                    finger2.consume()
-                                                }
-                                            }
-                                        }
-                                        
-                                        previousDistance = currentDistance
-                                    } else {
-                                        previousDistance = 0f
-                                    }
-                                }
-                            }
-                        }
-                }
-            )
-            // Handle double-tap when zoomed in to zoom out
-            .then(
-                if (scale > 1f) {
-                    Modifier.pointerInput(Unit) {
-                        detectTapGestures(
-                            onDoubleTap = {
-                                // Reset to 1x
-                                scale = 1f
-                                offsetX = 0f
-                                offsetY = 0f
-                            }
-                        )
-                    }
-                } else {
-                    Modifier
-                }
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        // Load image with correct orientation
-        val bitmapState = remember(contentData) {
-            mutableStateOf<Bitmap?>(null)
-        }
-        
-        LaunchedEffect(contentData) {
-            try {
-                bitmapState.value = loadBitmapWithCorrectOrientation(contentData, context)
-            } catch (e: Exception) {
-                android.util.Log.e("ZoomablePhoto", "Error loading image", e)
-                bitmapState.value = null
-            }
-        }
-        
-        val bitmap = bitmapState.value
-        
-        if (bitmap != null) {
-            androidx.compose.foundation.Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = "Photo",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer(
-                        scaleX = scale,
-                        scaleY = scale,
-                        translationX = offsetX,
-                        translationY = offsetY
-                    ),
-                contentScale = ContentScale.Fit
-            )
-        } else {
-            // Fallback to AsyncImage if bitmap loading fails
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(contentData)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = "Photo",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer(
-                        scaleX = scale,
-                        scaleY = scale,
-                        translationX = offsetX,
-                        translationY = offsetY
-                    ),
-                contentScale = ContentScale.Fit
-            )
-        }
-    }
+    // Use Telephoto's ZoomableAsyncImage - it handles:
+    // - Pinch to zoom
+    // - Double tap to zoom
+    // - Pan when zoomed
+    // - Works with HorizontalPager (nested scroll)
+    ZoomableAsyncImage(
+        model = ImageRequest.Builder(context)
+            .data(contentData)
+            .crossfade(true)
+            .build(),
+        contentDescription = "Photo",
+        modifier = Modifier.fillMaxSize(),
+        contentScale = ContentScale.Fit
+    )
 }
 
 /**
