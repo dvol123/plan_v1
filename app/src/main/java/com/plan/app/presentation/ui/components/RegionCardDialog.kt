@@ -1096,7 +1096,14 @@ private fun ZoomablePhoto(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { containerSize = it }
-            .transformable(state = transformableState)
+            // Only apply transformable when zoomed in - this allows pager to work when not zoomed
+            .then(
+                if (scale > 1f) {
+                    Modifier.transformable(state = transformableState)
+                } else {
+                    Modifier
+                }
+            )
             .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = { tapOffset ->
@@ -1173,6 +1180,28 @@ private fun ZoomablePhoto(
 }
 
 /**
+ * Get video rotation from file metadata
+ */
+private fun getVideoRotation(videoPath: String, context: android.content.Context): Int {
+    return try {
+        val retriever = android.media.MediaMetadataRetriever()
+        if (videoPath.startsWith("content://")) {
+            retriever.setDataSource(context, Uri.parse(videoPath))
+        } else if (videoPath.startsWith("/")) {
+            retriever.setDataSource(videoPath)
+        } else {
+            retriever.setDataSource(videoPath)
+        }
+        val rotation = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+        retriever.release()
+        rotation?.toIntOrNull() ?: 0
+    } catch (e: Exception) {
+        android.util.Log.e("VideoPlayer", "Error getting video rotation", e)
+        0
+    }
+}
+
+/**
  * Video player composable with proper lifecycle management
  * Each instance manages its own ExoPlayer
  */
@@ -1183,6 +1212,12 @@ private fun VideoPlayer(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    
+    // Get video rotation
+    var videoRotation by remember(videoUri) { mutableStateOf(0) }
+    LaunchedEffect(videoUri) {
+        videoRotation = getVideoRotation(videoUri, context)
+    }
     
     // Create ExoPlayer for this video
     val exoPlayer = remember(videoUri) {
@@ -1228,19 +1263,31 @@ private fun VideoPlayer(
         }
     }
     
-    // Render video
-    AndroidView(
-        factory = {
-            PlayerView(it).apply {
-                player = exoPlayer
-                layoutParams = FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-            }
-        },
-        modifier = Modifier.fillMaxSize()
-    )
+    // Render video with correct rotation
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                // Apply rotation if needed (for videos recorded in portrait)
+                rotationZ = videoRotation.toFloat()
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        AndroidView(
+            factory = {
+                PlayerView(it).apply {
+                    player = exoPlayer
+                    layoutParams = FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    // Let ExoPlayer handle the rotation automatically
+                    // But also apply manual rotation if needed
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+    }
 }
 
 /**
