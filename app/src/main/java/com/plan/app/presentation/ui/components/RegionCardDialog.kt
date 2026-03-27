@@ -848,8 +848,6 @@ private fun FullscreenMediaViewer(
     initialIndex: Int,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
     
     // Pager state for swipe between photos
@@ -860,48 +858,6 @@ private fun FullscreenMediaViewer(
     
     // Current content based on pager
     val currentIndex = pagerState.currentPage
-    val content = mediaContents.getOrNull(currentIndex) ?: return
-    
-    // Video player state
-    var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
-    
-    // Safe release function for ExoPlayer
-    fun safeReleasePlayer() {
-        try {
-            exoPlayer?.let { player ->
-                player.stop()
-                player.release()
-            }
-            exoPlayer = null
-        } catch (e: Exception) {
-            android.util.Log.e("FullscreenMediaViewer", "Error releasing ExoPlayer", e)
-        }
-    }
-    
-    // Release video player when page changes
-    LaunchedEffect(currentIndex) {
-        safeReleasePlayer()
-    }
-    
-    // Lifecycle awareness for ExoPlayer
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_PAUSE -> {
-                    try { exoPlayer?.pause() } catch (_: Exception) {}
-                }
-                Lifecycle.Event.ON_STOP -> {
-                    try { exoPlayer?.pause() } catch (_: Exception) {}
-                }
-                else -> {}
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            safeReleasePlayer()
-        }
-    }
     
     Dialog(
         onDismissRequest = onDismiss,
@@ -947,38 +903,11 @@ private fun FullscreenMediaViewer(
                         )
                     }
                     ContentType.VIDEO -> {
-                        // Initialize ExoPlayer for this video
-                        val videoExoPlayer by remember(pageContent.data) {
-                            mutableStateOf<ExoPlayer?>(null)
-                        }
-                        
-                        LaunchedEffect(pageContent.data) {
-                            try {
-                                exoPlayer = ExoPlayer.Builder(context).build().apply {
-                                    val mediaItem = androidx.media3.common.MediaItem.fromUri(pageContent.data)
-                                    setMediaItem(mediaItem)
-                                    prepare()
-                                    playWhenReady = true
-                                }
-                            } catch (e: Exception) {
-                                android.util.Log.e("FullscreenMediaViewer", "Error creating ExoPlayer", e)
-                            }
-                        }
-                        
-                        exoPlayer?.let { player ->
-                            AndroidView(
-                                factory = {
-                                    PlayerView(it).apply {
-                                        this.player = player
-                                        layoutParams = FrameLayout.LayoutParams(
-                                            ViewGroup.LayoutParams.MATCH_PARENT,
-                                            ViewGroup.LayoutParams.MATCH_PARENT
-                                        )
-                                    }
-                                },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
+                        // Each video page has its own player managed by VideoPlayer composable
+                        VideoPlayer(
+                            videoUri = pageContent.data,
+                            isCurrentPage = page == currentIndex
+                        )
                     }
                     ContentType.TEXT -> {
                         // Not shown in fullscreen
@@ -995,7 +924,6 @@ private fun FullscreenMediaViewer(
                 if (currentIndex > 0) {
                     IconButton(
                         onClick = { 
-                            safeReleasePlayer()
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(currentIndex - 1)
                             }
@@ -1019,7 +947,6 @@ private fun FullscreenMediaViewer(
                 if (currentIndex < mediaContents.size - 1) {
                     IconButton(
                         onClick = { 
-                            safeReleasePlayer()
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(currentIndex + 1)
                             }
@@ -1243,6 +1170,77 @@ private fun ZoomablePhoto(
             )
         }
     }
+}
+
+/**
+ * Video player composable with proper lifecycle management
+ * Each instance manages its own ExoPlayer
+ */
+@Composable
+private fun VideoPlayer(
+    videoUri: String,
+    isCurrentPage: Boolean
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    
+    // Create ExoPlayer for this video
+    val exoPlayer = remember(videoUri) {
+        ExoPlayer.Builder(context).build().apply {
+            val mediaItem = androidx.media3.common.MediaItem.fromUri(videoUri)
+            setMediaItem(mediaItem)
+            prepare()
+        }
+    }
+    
+    // Manage playback based on page visibility
+    LaunchedEffect(isCurrentPage) {
+        if (isCurrentPage) {
+            exoPlayer.playWhenReady = true
+        } else {
+            exoPlayer.playWhenReady = false
+            exoPlayer.pause()
+        }
+    }
+    
+    // Lifecycle awareness
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    try { exoPlayer.pause() } catch (_: Exception) {}
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    try { exoPlayer.pause() } catch (_: Exception) {}
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            try {
+                exoPlayer.stop()
+                exoPlayer.release()
+            } catch (e: Exception) {
+                android.util.Log.e("VideoPlayer", "Error releasing ExoPlayer", e)
+            }
+        }
+    }
+    
+    // Render video
+    AndroidView(
+        factory = {
+            PlayerView(it).apply {
+                player = exoPlayer
+                layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+        },
+        modifier = Modifier.fillMaxSize()
+    )
 }
 
 /**
