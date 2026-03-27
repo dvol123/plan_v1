@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -554,18 +555,18 @@ private fun ZoomablePhotoWithOverlay(
     // Calculate the actual displayed image bounds (after ContentScale.Fit)
     val imageDisplayRect = remember(photoWidth, photoHeight, originalImageWidth, originalImageHeight) {
         if (photoWidth > 0 && photoHeight > 0 && originalImageWidth > 0 && originalImageHeight > 0) {
-            val containerAspect = photoWidth.toFloat() / photoHeight
-            val imageAspect = originalImageWidth.toFloat() / originalImageHeight
+            val containerAspect = photoWidth.toFloat() / photoHeight.toFloat()
+            val imageAspect = originalImageWidth.toFloat() / originalImageHeight.toFloat()
             
             if (containerAspect > imageAspect) {
                 // Container is wider - image is constrained by height
-                val displayWidth = photoHeight * imageAspect
-                val offsetX = (photoWidth - displayWidth) / 2
+                val displayWidth = photoHeight.toFloat() * imageAspect
+                val offsetX = (photoWidth.toFloat() - displayWidth) / 2f
                 android.graphics.RectF(offsetX, 0f, offsetX + displayWidth, photoHeight.toFloat())
             } else {
                 // Container is taller - image is constrained by width
-                val displayHeight = photoWidth / imageAspect
-                val offsetY = (photoHeight - displayHeight) / 2
+                val displayHeight = photoWidth.toFloat() / imageAspect
+                val offsetY = (photoHeight.toFloat() - displayHeight) / 2f
                 android.graphics.RectF(0f, offsetY, photoWidth.toFloat(), offsetY + displayHeight)
             }
         } else {
