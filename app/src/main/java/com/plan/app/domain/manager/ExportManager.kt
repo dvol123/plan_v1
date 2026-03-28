@@ -1598,8 +1598,10 @@ class ExportManager @Inject constructor(
         val next: String,
         val backToGrid: String,
         // Empty states
+        val selectProjectOrRegion: String,
         val selectRegionToViewMedia: String,
         val noMediaForRegion: String,
+        val noPhotoAvailable: String,
         // Filter
         val filterByState: String,
         val allStates: String,
@@ -1634,8 +1636,10 @@ class ExportManager @Inject constructor(
                         prev = "◀ Назад",
                         next = "Вперёд ▶",
                         backToGrid = "✕ К галерее",
+                        selectProjectOrRegion = "Выберите проект или область",
                         selectRegionToViewMedia = "Выберите область для просмотра медиа",
                         noMediaForRegion = "Нет медиа для этой области",
+                        noPhotoAvailable = "Нет фото",
                         filterByState = "Фильтр по состоянию:",
                         allStates = "Все состояния",
                         searchPlaceholder = "Поиск...",
@@ -1664,8 +1668,10 @@ class ExportManager @Inject constructor(
                         prev = "◀ 上一个",
                         next = "下一个 ▶",
                         backToGrid = "✕ 返回",
+                        selectProjectOrRegion = "选择项目或区域",
                         selectRegionToViewMedia = "选择区域以查看媒体内容",
                         noMediaForRegion = "此区域没有媒体内容",
+                        noPhotoAvailable = "无照片",
                         filterByState = "按状态筛选：",
                         allStates = "所有状态",
                         searchPlaceholder = "搜索...",
@@ -1694,8 +1700,10 @@ class ExportManager @Inject constructor(
                         prev = "◀ Prev",
                         next = "Next ▶",
                         backToGrid = "✕ Back to Grid",
+                        selectProjectOrRegion = "Select a project or region",
                         selectRegionToViewMedia = "Select a region to view media content",
                         noMediaForRegion = "No media content for this region",
+                        noPhotoAvailable = "No photo available",
                         filterByState = "Filter by State:",
                         allStates = "All States",
                         searchPlaceholder = "Search...",
@@ -1796,10 +1804,16 @@ class ExportManager @Inject constructor(
         builder.append(".viewer-btn:hover{background:rgba(255,255,255,0.2);}")
         builder.append(".viewer-btn:disabled{opacity:0.5;cursor:not-allowed;}")
         builder.append(".viewer-content{flex:1;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;}")
-        builder.append(".viewer-content img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;}")
+        builder.append(".viewer-content img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;transform-origin:center;transition:transform 0.15s ease-out;cursor:grab;}")
+        builder.append(".viewer-content img.zoomed{cursor:move;}")
         builder.append(".viewer-content video{max-width:100%;max-height:100%;border-radius:4px;}")
         builder.append(".viewer-footer{display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 16px;background:#2a2a2a;flex-shrink:0;}")
         builder.append(".viewer-counter{color:#aaa;font-size:13px;}")
+        // Zoom controls
+        builder.append(".zoom-controls{display:flex;align-items:center;gap:4px;margin-right:16px;padding-right:16px;border-right:1px solid rgba(255,255,255,0.2);}")
+        builder.append(".zoom-btn{background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:14px;transition:background 0.2s;min-width:36px;text-align:center;}")
+        builder.append(".zoom-btn:hover{background:rgba(255,255,255,0.2);}")
+        builder.append(".zoom-level{color:#fff;font-size:12px;min-width:45px;text-align:center;font-family:monospace;}")
         // Empty state
         builder.append(".empty-state{text-align:center;padding:40px 20px;color:#999;}")
         builder.append(".empty-state-icon{font-size:48px;margin-bottom:16px;opacity:0.5;}")
@@ -1832,7 +1846,7 @@ class ExportManager @Inject constructor(
         // Search bar
         builder.append("<div class='search-bar'>")
         builder.append("<div class='search-wrapper'>")
-        builder.append("<input type='text' class='search-input' id='searchInput' placeholder='Search by project name, region name, or types...' autocomplete='off'>")
+        builder.append("<input type='text' class='search-input' id='searchInput' placeholder='${t.searchPlaceholder}' autocomplete='off'>")
         builder.append("<div class='search-results' id='searchResults'></div>")
         builder.append("</div>")
         builder.append("</div>")
@@ -1842,7 +1856,7 @@ class ExportManager @Inject constructor(
         builder.append("<div class='left-column' id='leftColumn'>")
         // Part 1: Tree panel
         builder.append("<div class='panel tree-panel' id='treePanel'>")
-        builder.append("<div class='panel-header light'><span>Projects & Regions</span><span id='totalCount'>0 items</span></div>")
+        builder.append("<div class='panel-header light'><span>${t.projectsAndRegions}</span><span id='totalCount'>0 ${t.items}</span></div>")
         builder.append("<div class='panel-content' id='treeContent'>")
         // Tree structure
         for ((projectIndex, projectData) in allProjectsData.withIndex()) {
@@ -1877,9 +1891,9 @@ class ExportManager @Inject constructor(
         builder.append("<div class='h-resizer' id='hResizer'></div>")
         // Part 2: Info panel
         builder.append("<div class='panel info-panel' id='infoPanel'>")
-        builder.append("<div class='panel-header light'>Details</div>")
+        builder.append("<div class='panel-header light'>${t.regionDetails}</div>")
         builder.append("<div class='panel-content' id='infoContent'>")
-        builder.append("<div class='empty-state'><div class='empty-state-icon'>📋</div><div>Select a project or region to view details</div></div>")
+        builder.append("<div class='empty-state'><div class='empty-state-icon'>📋</div><div>${t.selectProjectOrRegion}</div></div>")
         builder.append("</div>")
         builder.append("</div>")
         builder.append("</div>") // Close left-column
@@ -1888,22 +1902,28 @@ class ExportManager @Inject constructor(
         // Right column (Part 3: Media panel)
         builder.append("<div class='right-column'>")
         builder.append("<div class='panel media-panel'>")
-        builder.append("<div class='panel-header'><span>Media Content</span><span id='mediaCount'>0 items</span></div>")
+        builder.append("<div class='panel-header'><span>${t.mediaContent}</span><span id='mediaCount'>0 ${t.items}</span></div>")
         builder.append("<div class='panel-content' id='mediaContent'>")
-        builder.append("<div class='empty-state'><div class='empty-state-icon'>📷</div><div>Select a region to view media content</div></div>")
+        builder.append("<div class='empty-state'><div class='empty-state-icon'>📷</div><div>${t.selectRegionToViewMedia}</div></div>")
         builder.append("</div>")
         // Media viewer
         builder.append("<div class='media-viewer' id='mediaViewer'>")
         builder.append("<div class='viewer-header'>")
-        builder.append("<span class='viewer-title' id='viewerTitle'>Photo</span>")
+        builder.append("<span class='viewer-title' id='viewerTitle'>${t.photo}</span>")
         builder.append("<div class='viewer-nav'>")
-        builder.append("<button class='viewer-btn' id='btnPrev' onclick='navigateMedia(-1)'>◀ Prev</button>")
-        builder.append("<button class='viewer-btn' id='btnNext' onclick='navigateMedia(1)'>Next ▶</button>")
-        builder.append("<button class='viewer-btn' onclick='closeViewer()'>✕ Back to Grid</button>")
+        builder.append("<button class='viewer-btn' id='btnPrev' onclick='navigateMedia(-1)'>${t.prev}</button>")
+        builder.append("<button class='viewer-btn' id='btnNext' onclick='navigateMedia(1)'>${t.next}</button>")
+        builder.append("<button class='viewer-btn' onclick='closeViewer()'>${t.backToGrid}</button>")
         builder.append("</div>")
         builder.append("</div>")
         builder.append("<div class='viewer-content' id='viewerContent'></div>")
         builder.append("<div class='viewer-footer'>")
+        builder.append("<div class='zoom-controls'>")
+        builder.append("<button class='zoom-btn' onclick='zoomOut()' title='Zoom Out'>${t.zoomOut}</button>")
+        builder.append("<span class='zoom-level' id='zoomLevel'>100%</span>")
+        builder.append("<button class='zoom-btn' onclick='zoomIn()' title='Zoom In'>${t.zoomIn}</button>")
+        builder.append("<button class='zoom-btn' onclick='resetZoom()' title='Reset'>${t.resetZoom}</button>")
+        builder.append("</div>")
         builder.append("<span class='viewer-counter' id='viewerCounter'>1 / 1</span>")
         builder.append("</div>")
         builder.append("</div>")
@@ -1957,11 +1977,29 @@ class ExportManager @Inject constructor(
         builder.append("let currentRegionIndex=-1;")
         builder.append("let currentMediaIndex=0;")
         builder.append("let currentMediaList=[];")
+        // Translations
+        builder.append("const i18n={")
+        builder.append("regionName:'${escapeJs(t.regionName)}',")
+        builder.append("project:'${escapeJs(t.projectsAndRegions)}',")
+        builder.append("state:'${escapeJs(t.state)}',")
+        builder.append("type1:'${escapeJs(t.type1)}',")
+        builder.append("type2:'${escapeJs(t.type2)}',")
+        builder.append("description:'${escapeJs(t.description)}',")
+        builder.append("note:'${escapeJs(t.note)}',")
+        builder.append("regions:'${escapeJs(t.regions)}',")
+        builder.append("photo:'${escapeJs(t.photo)}',")
+        builder.append("video:'${escapeJs(t.video)}',")
+        builder.append("item:'${escapeJs(t.item)}',")
+        builder.append("items:'${escapeJs(t.items)}',")
+        builder.append("noMediaForRegion:'${escapeJs(t.noMediaForRegion)}',")
+        builder.append("noPhotoAvailable:'${escapeJs(t.noPhotoAvailable)}',")
+        builder.append("viewPhotoWithAreas:'${escapeJs(t.viewPhotoWithAreas)}'")
+        builder.append("};")
         // Update total count
         builder.append("(function(){")
         builder.append("let total=0;")
         builder.append("projectsData.forEach(p=>total+=p.regions.length+1);")
-        builder.append("document.getElementById('totalCount').textContent=total+' items';")
+        builder.append("document.getElementById('totalCount').textContent=total+' '+i18n.items;")
         builder.append("})();")
         // Search functionality
         builder.append("const searchInput=document.getElementById('searchInput');")
@@ -2020,22 +2058,22 @@ class ExportManager @Inject constructor(
         builder.append("const p=projectsData[index];")
         builder.append("if(!p)return;")
         builder.append("const infoContent=document.getElementById('infoContent');")
-        builder.append("let infoHtml='<div class=\\'project-header\\'><h1>'+p.name+'</h1><div class=\\'meta\\'>'+p.regions.length+' regions</div></div>';")
-        builder.append("if(p.description)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Description</div><div class=\\'info-value\\'>'+p.description+'</div></div>';")
-        builder.append("if(p.type1)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Type 1</div><div class=\\'info-value\\'>'+p.type1+'</div></div>';")
-        builder.append("if(p.type2)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Type 2</div><div class=\\'info-value\\'>'+p.type2+'</div></div>';")
-        builder.append("if(p.note)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Note</div><div class=\\'info-value\\'>'+p.note+'</div></div>';")
+        builder.append("let infoHtml='<div class=\\'project-header\\'><h1>'+p.name+'</h1><div class=\\'meta\\'>'+p.regions.length+' '+i18n.regions+'</div></div>';")
+        builder.append("if(p.description)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>'+i18n.description+'</div><div class=\\'info-value\\'>'+p.description+'</div></div>';")
+        builder.append("if(p.type1)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>'+i18n.type1+'</div><div class=\\'info-value\\'>'+p.type1+'</div></div>';")
+        builder.append("if(p.type2)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>'+i18n.type2+'</div><div class=\\'info-value\\'>'+p.type2+'</div></div>';")
+        builder.append("if(p.note)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>'+i18n.note+'</div><div class=\\'info-value\\'>'+p.note+'</div></div>';")
         builder.append("infoContent.innerHTML=infoHtml;")
         // Show project photo in media panel
         builder.append("const mediaContent=document.getElementById('mediaContent');")
         builder.append("if(p.photoPath){")
         builder.append("currentMediaList=[{type:'photo',path:p.photoPath}];")
-        builder.append("document.getElementById('mediaCount').textContent='1 item';")
-        builder.append("mediaContent.innerHTML='<div class=\\'media-grid\\'><div class=\\'media-item\\' onclick=\\'openMediaItem(0)\\'><img src=\\''+p.photoPath+'\\' alt=\\'Photo with areas\\' loading=\\'lazy\\'><div class=\\'media-caption\\'><span class=\\'media-type photo\\'>Photo with areas</span></div></div></div>';")
+        builder.append("document.getElementById('mediaCount').textContent='1 '+i18n.item;")
+        builder.append("mediaContent.innerHTML='<div class=\\'media-grid\\'><div class=\\'media-item\\' onclick=\\'openMediaItem(0)\\'><img src=\\''+p.photoPath+'\\' alt=\\'Photo with areas\\' loading=\\'lazy\\'><div class=\\'media-caption\\'><span class=\\'media-type photo\\'>'+i18n.viewPhotoWithAreas+'</span></div></div></div>';")
         builder.append("}else{")
         builder.append("currentMediaList=[];")
-        builder.append("document.getElementById('mediaCount').textContent='0 items';")
-        builder.append("mediaContent.innerHTML='<div class=\\'empty-state\\'><div class=\\'empty-state-icon\\'>📷</div><div>No photo available</div></div>';")
+        builder.append("document.getElementById('mediaCount').textContent='0 '+i18n.items;")
+        builder.append("mediaContent.innerHTML='<div class=\\'empty-state\\'><div class=\\'empty-state-icon\\'>📷</div><div>'+i18n.noPhotoAvailable+'</div></div>';")
         builder.append("}")
         builder.append("}")
         // Show project photo
@@ -2045,7 +2083,7 @@ class ExportManager @Inject constructor(
         builder.append("currentMediaList=[{type:'photo',path:p.photoPath}];")
         builder.append("currentMediaIndex=0;")
         builder.append("openViewer();")
-        builder.append("document.getElementById('viewerTitle').textContent='Photo - '+p.name;")
+        builder.append("document.getElementById('viewerTitle').textContent=i18n.photo+' - '+p.name;")
         builder.append("}")
         // Select region
         builder.append("function selectRegion(projectIndex,regionIndex){")
@@ -2060,13 +2098,13 @@ class ExportManager @Inject constructor(
         builder.append("const r=p.regions[regionIndex];")
         builder.append("if(!r)return;")
         builder.append("const infoContent=document.getElementById('infoContent');")
-        builder.append("let infoHtml='<div class=\\'info-section\\'><div class=\\'info-label\\'>Region Name</div><div class=\\'info-value\\' style=\\'font-size:18px;font-weight:600;\\'>'+r.name+'</div></div>';")
-        builder.append("infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Project</div><div class=\\'info-value\\'>'+p.name+'</div></div>';")
-        builder.append("infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>State</div><div class=\\'info-value\\'><span class=\\'color-indicator\\' style=\\'background-color:'+r.stateColor+';margin-right:8px;\\'></span>'+r.stateName+'</div></div>';")
-        builder.append("if(r.type1)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Type 1</div><div class=\\'info-value\\'>'+r.type1+'</div></div>';")
-        builder.append("if(r.type2)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Type 2</div><div class=\\'info-value\\'>'+r.type2+'</div></div>';")
-        builder.append("if(r.description)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Description</div><div class=\\'info-value\\'>'+r.description+'</div></div>';")
-        builder.append("if(r.note)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>Note</div><div class=\\'info-value\\'>'+r.note+'</div></div>';")
+        builder.append("let infoHtml='<div class=\\'info-section\\'><div class=\\'info-label\\'>'+i18n.regionName+'</div><div class=\\'info-value\\' style=\\'font-size:18px;font-weight:600;\\'>'+r.name+'</div></div>';")
+        builder.append("infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>'+i18n.project+'</div><div class=\\'info-value\\'>'+p.name+'</div></div>';")
+        builder.append("infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>'+i18n.state+'</div><div class=\\'info-value\\'><span class=\\'color-indicator\\' style=\\'background-color:'+r.stateColor+';margin-right:8px;\\'></span>'+r.stateName+'</div></div>';")
+        builder.append("if(r.type1)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>'+i18n.type1+'</div><div class=\\'info-value\\'>'+r.type1+'</div></div>';")
+        builder.append("if(r.type2)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>'+i18n.type2+'</div><div class=\\'info-value\\'>'+r.type2+'</div></div>';")
+        builder.append("if(r.description)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>'+i18n.description+'</div><div class=\\'info-value\\'>'+r.description+'</div></div>';")
+        builder.append("if(r.note)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>'+i18n.note+'</div><div class=\\'info-value\\'>'+r.note+'</div></div>';")
         builder.append("infoContent.innerHTML=infoHtml;")
         builder.append("updateMediaPanel(r);")
         builder.append("}")
@@ -2074,17 +2112,17 @@ class ExportManager @Inject constructor(
         builder.append("function updateMediaPanel(region){")
         builder.append("const mediaContent=document.getElementById('mediaContent');")
         builder.append("currentMediaList=region.contents||[];")
-        builder.append("document.getElementById('mediaCount').textContent=currentMediaList.length+' item'+(currentMediaList.length!==1?'s':'');")
+        builder.append("document.getElementById('mediaCount').textContent=currentMediaList.length+' '+(currentMediaList.length===1?i18n.item:i18n.items);")
         builder.append("if(currentMediaList.length===0){")
-        builder.append("mediaContent.innerHTML='<div class=\\'empty-state\\'><div class=\\'empty-state-icon\\'>📷</div><div>No media content for this region</div></div>';")
+        builder.append("mediaContent.innerHTML='<div class=\\'empty-state\\'><div class=\\'empty-state-icon\\'>📷</div><div>'+i18n.noMediaForRegion+'</div></div>';")
         builder.append("return;")
         builder.append("}")
         builder.append("let html='<div class=\\'media-grid\\'>';")
         builder.append("currentMediaList.forEach(function(item,index){")
         builder.append("if(item.type==='photo'){")
-        builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><img src=\\''+item.path+'\\' alt=\\'Photo\\' loading=\\'lazy\\'><div class=\\'media-caption\\'><span class=\\'media-type photo\\'>Photo</span></div></div>';")
+        builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><img src=\\''+item.path+'\\' alt=\\'Photo\\' loading=\\'lazy\\'><div class=\\'media-caption\\'><span class=\\'media-type photo\\'>'+i18n.photo+'</span></div></div>';")
         builder.append("}else if(item.type==='video'){")
-        builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><video src=\\''+item.path+'\\' preload=\\'metadata\\' muted></video><div class=\\'media-caption\\'><span class=\\'media-type video\\'>Video</span></div></div>';")
+        builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><video src=\\''+item.path+'\\' preload=\\'metadata\\' muted></video><div class=\\'media-caption\\'><span class=\\'media-type video\\'>'+i18n.video+'</span></div></div>';")
         builder.append("}")
         builder.append("});")
         builder.append("html+='</div>';")
@@ -2094,6 +2132,7 @@ class ExportManager @Inject constructor(
         builder.append("function openMediaItem(index){currentMediaIndex=index;openViewer();}")
         builder.append("function openViewer(){")
         builder.append("if(currentMediaList.length===0)return;")
+        builder.append("resetZoom();")
         builder.append("document.getElementById('mediaContent').style.display='none';")
         builder.append("document.getElementById('mediaViewer').classList.add('active');")
         builder.append("updateViewerContent();")
@@ -2104,6 +2143,7 @@ class ExportManager @Inject constructor(
         builder.append("}")
         builder.append("function updateViewerContent(){")
         builder.append("if(currentMediaList.length===0)return;")
+        builder.append("resetZoom();")
         builder.append("const item=currentMediaList[currentMediaIndex];")
         builder.append("const viewerContent=document.getElementById('viewerContent');")
         builder.append("const viewerTitle=document.getElementById('viewerTitle');")
@@ -2112,11 +2152,11 @@ class ExportManager @Inject constructor(
         builder.append("const p=projectsData[currentProjectIndex];")
         builder.append("const r=p&&currentRegionIndex>=0?p.regions[currentRegionIndex]:null;")
         builder.append("if(item.type==='photo'){")
-        builder.append("viewerContent.innerHTML='<img src=\\''+item.path+'\\' alt=\\'Photo\\'>';")
-        builder.append("viewerTitle.textContent='Photo - '+(r?r.name:p?r.name:'Project');")
+        builder.append("viewerContent.innerHTML='<img src=\\''+item.path+'\\' alt=\\'Photo\\' id=\\'viewerImg\\'>';")
+        builder.append("viewerTitle.textContent=i18n.photo+' - '+(r?r.name:p?p.name:'Project');")
         builder.append("}else if(item.type==='video'){")
         builder.append("viewerContent.innerHTML='<video controls autoplay><source src=\\''+item.path+'\\' type=\\'video/mp4\\'>Your browser does not support video.</video>';")
-        builder.append("viewerTitle.textContent='Video - '+(r?r.name:p?r.name:'Project');")
+        builder.append("viewerTitle.textContent=i18n.video+' - '+(r?r.name:p?p.name:'Project');")
         builder.append("}")
         builder.append("document.getElementById('btnPrev').disabled=currentMediaIndex===0;")
         builder.append("document.getElementById('btnNext').disabled=currentMediaIndex===currentMediaList.length-1;")
@@ -2125,11 +2165,34 @@ class ExportManager @Inject constructor(
         builder.append("const newIndex=currentMediaIndex+direction;")
         builder.append("if(newIndex>=0&&newIndex<currentMediaList.length){currentMediaIndex=newIndex;updateViewerContent();}")
         builder.append("}")
+        // Zoom functions
+        builder.append("let currentZoom=1;")
+        builder.append("const zoomStep=0.25;")
+        builder.append("const minZoom=0.25;")
+        builder.append("const maxZoom=4;")
+        builder.append("function updateZoom(){")
+        builder.append("const img=document.getElementById('viewerImg');")
+        builder.append("if(img){")
+        builder.append("img.style.transform='scale('+currentZoom+')';")
+        builder.append("img.classList.toggle('zoomed',currentZoom!==1);")
+        builder.append("}")
+        builder.append("document.getElementById('zoomLevel').textContent=Math.round(currentZoom*100)+'%';")
+        builder.append("}")
+        builder.append("function zoomIn(){")
+        builder.append("if(currentZoom<maxZoom){currentZoom=Math.min(maxZoom,currentZoom+zoomStep);updateZoom();}")
+        builder.append("}")
+        builder.append("function zoomOut(){")
+        builder.append("if(currentZoom>minZoom){currentZoom=Math.max(minZoom,currentZoom-zoomStep);updateZoom();}")
+        builder.append("}")
+        builder.append("function resetZoom(){currentZoom=1;updateZoom();}")
         builder.append("document.addEventListener('keydown',function(e){")
         builder.append("if(!document.getElementById('mediaViewer').classList.contains('active'))return;")
         builder.append("if(e.key==='ArrowLeft')navigateMedia(-1);")
         builder.append("else if(e.key==='ArrowRight')navigateMedia(1);")
         builder.append("else if(e.key==='Escape')closeViewer();")
+        builder.append("else if(e.key==='+'||e.key==='=')zoomIn();")
+        builder.append("else if(e.key==='-')zoomOut();")
+        builder.append("else if(e.key==='0')resetZoom();")
         builder.append("});")
         // Resizers
         builder.append("(function(){")
