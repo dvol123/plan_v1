@@ -95,7 +95,8 @@ dependencies {
     
     // Zoomable library for pinch-to-zoom with HorizontalPager support
     // https://github.com/usuiat/Zoomable
-    implementation("net.engawapg.lib:zoomable:2.11.1")
+    // Version 1.6.2 is the last stable version compatible with SDK 34
+    implementation("net.engawapg.lib:zoomable:1.6.2")
     
     // Gson for JSON
     implementation("com.google.code.gson:gson:2.10.1")
