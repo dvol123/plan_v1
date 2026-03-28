@@ -101,6 +101,7 @@
     <string name="export_success">Проект успешно экспортирован</string>
     <string name="export_error">Ошибка экспорта проекта</string>
     <string name="import_success">Проект успешно импортирован</string>
+    <string name="import_success_multiple">Импортировано %d проектов</string>
     <string name="import_error">Ошибка импорта проекта</string>
     <string name="select_export_location">Выберите место экспорта</string>
     <string name="select_import_file">Выберите ZIP файл для импорта</string>

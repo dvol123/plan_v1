@@ -101,6 +101,7 @@
     <string name="export_success">项目导出成功</string>
     <string name="export_error">项目导出失败</string>
     <string name="import_success">项目导入成功</string>
+    <string name="import_success_multiple">成功导入 %d 个项目</string>
     <string name="import_error">项目导入失败</string>
     <string name="select_export_location">选择导出位置</string>
     <string name="select_import_file">选择要导入的ZIP文件</string>

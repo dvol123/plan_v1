@@ -313,12 +313,20 @@ class MainViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val result = exportManager.importFromZip(zipUri)
+                val message = if (result.success) {
+                    if (result.importedCount > 1) {
+                        "Imported ${result.importedCount} projects"
+                    } else {
+                        "Import successful"
+                    }
+                } else result.error
+                
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     importSuccess = result.success,
-                    importMessage = if (result.success) "Import successful" else result.error
+                    importMessage = message
                 )
-                onComplete(result.success, result.error)
+                onComplete(result.success, message)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
