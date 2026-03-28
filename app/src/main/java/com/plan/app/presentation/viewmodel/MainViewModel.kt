@@ -10,6 +10,7 @@ import com.plan.app.domain.model.Project
 import com.plan.app.domain.usecase.GetProjectsUseCase
 import com.plan.app.domain.usecase.ManageProjectUseCase
 import com.plan.app.domain.usecase.ManageRegionUseCase
+import com.plan.app.presentation.ui.components.AppPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -205,7 +206,7 @@ class MainViewModel @Inject constructor(
     }
     
     // Export project as HTML report in ZIP (for viewing on PC)
-    fun exportProjectForPC(outputFile: File, project: Project? = null, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
+    fun exportProjectForPC(context: Context, outputFile: File, project: Project? = null, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
@@ -220,7 +221,8 @@ class MainViewModel @Inject constructor(
                     return@launch
                 }
                 
-                val result = exportManager.exportForPCToZip(targetProject, outputFile)
+                val languageCode = AppPreferences.getLanguage(context)
+                val result = exportManager.exportForPCToZip(targetProject, outputFile, languageCode)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     exportSuccess = result.success,
@@ -285,11 +287,12 @@ class MainViewModel @Inject constructor(
     }
     
     // Export all projects as HTML reports in ZIP (for viewing on PC)
-    fun exportAllProjectsForPC(outputFile: File, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
+    fun exportAllProjectsForPC(context: Context, outputFile: File, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
-                val result = exportManager.exportAllProjectsForPC(outputFile)
+                val languageCode = AppPreferences.getLanguage(context)
+                val result = exportManager.exportAllProjectsForPC(outputFile, languageCode)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     exportSuccess = result.success,

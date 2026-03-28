@@ -123,7 +123,7 @@ fun MainScreen(
     ) { uri: Uri? ->
         uri?.let {
             val tempFile = File(context.cacheDir, "export_html_temp.zip")
-            viewModel.exportProjectForPC(tempFile) { success, error ->
+            viewModel.exportProjectForPC(context, tempFile) { success, error ->
                 if (success) {
                     context.contentResolver.openOutputStream(uri)?.use { output ->
                         tempFile.inputStream().use { input ->
@@ -145,7 +145,7 @@ fun MainScreen(
     ) { uri: Uri? ->
         uri?.let {
             val tempFile = File(context.cacheDir, "export_all_html_temp.zip")
-            viewModel.exportAllProjectsForPC(tempFile) { success, error ->
+            viewModel.exportAllProjectsForPC(context, tempFile) { success, error ->
                 if (success) {
                     context.contentResolver.openOutputStream(uri)?.use { output ->
                         tempFile.inputStream().use { input ->

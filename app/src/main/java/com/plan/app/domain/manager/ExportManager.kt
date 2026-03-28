@@ -601,11 +601,13 @@ class ExportManager @Inject constructor(
         project: Project,
         regions: List<Region>,
         states: List<State>,
-        regionContentsMap: Map<Long, List<ContentExportInfo>>
+        regionContentsMap: Map<Long, List<ContentExportInfo>>,
+        languageCode: String = "ru"
     ): String {
+        val t = HtmlTranslations.forLanguage(languageCode)
         val builder = StringBuilder()
         builder.append("<!DOCTYPE html>")
-        builder.append("<html lang='en'>")
+        builder.append("<html lang='${t.htmlLang}'>")
         builder.append("<head>")
         builder.append("<meta charset='UTF-8'>")
         builder.append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
@@ -671,10 +673,16 @@ class ExportManager @Inject constructor(
         builder.append(".viewer-btn:hover{background:rgba(255,255,255,0.2);}")
         builder.append(".viewer-btn:disabled{opacity:0.5;cursor:not-allowed;}")
         builder.append(".viewer-content{flex:1;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;}")
-        builder.append(".viewer-content img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;}")
+        builder.append(".viewer-content img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;transform-origin:center;transition:transform 0.15s ease-out;cursor:grab;}")
+        builder.append(".viewer-content img.zoomed{cursor:move;}")
         builder.append(".viewer-content video{max-width:100%;max-height:100%;border-radius:4px;}")
         builder.append(".viewer-footer{display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 16px;background:#2a2a2a;flex-shrink:0;}")
         builder.append(".viewer-counter{color:#aaa;font-size:13px;}")
+        // Zoom controls
+        builder.append(".zoom-controls{display:flex;align-items:center;gap:4px;margin-right:16px;padding-right:16px;border-right:1px solid rgba(255,255,255,0.2);}")
+        builder.append(".zoom-btn{background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:14px;transition:background 0.2s;min-width:36px;text-align:center;}")
+        builder.append(".zoom-btn:hover{background:rgba(255,255,255,0.2);}")
+        builder.append(".zoom-level{color:#fff;font-size:12px;min-width:45px;text-align:center;font-family:monospace;}")
         // Empty state
         builder.append(".empty-state{text-align:center;padding:40px 20px;color:#999;}")
         builder.append(".empty-state-icon{font-size:48px;margin-bottom:16px;opacity:0.5;}")
@@ -714,12 +722,12 @@ class ExportManager @Inject constructor(
         builder.append("<div class='left-column' id='leftColumn'>")
         // Part 1: Tree panel
         builder.append("<div class='panel tree-panel' id='treePanel'>")
-        builder.append("<div class='panel-header light'><span>Projects & Regions</span><span id='regionCount'>${regions.size} regions</span></div>")
+        builder.append("<div class='panel-header light'><span>${t.projectsAndRegions}</span><span id='regionCount'>${regions.size} ${t.regions}</span></div>")
         // Filter by state
         builder.append("<div class='filter-container'>")
-        builder.append("<label class='filter-label'>Filter by State:</label>")
+        builder.append("<label class='filter-label'>${t.filterByState}</label>")
         builder.append("<select class='filter-select' id='stateFilter' onchange='filterByState(this.value)'>")
-        builder.append("<option value=''>All States</option>")
+        builder.append("<option value=''>${t.allStates}</option>")
         for (state in states) {
             val colorHex = "#${Integer.toHexString(state.color).substring(2).uppercase()}"
             builder.append("<option value='${state.id}'>${escapeHtml(state.name)}</option>")
@@ -753,26 +761,26 @@ class ExportManager @Inject constructor(
         builder.append("<div class='h-resizer' id='hResizer'></div>")
         // Part 2: Info panel
         builder.append("<div class='panel info-panel' id='infoPanel'>")
-        builder.append("<div class='panel-header light'>Region Details</div>")
+        builder.append("<div class='panel-header light'>${t.regionDetails}</div>")
         builder.append("<div class='panel-content' id='infoContent'>")
         // Project info by default
         builder.append("<div class='project-header'>")
         builder.append("<h1>${escapeHtml(project.name)}</h1>")
-        builder.append("<div class='meta'>${regions.size} regions</div>")
+        builder.append("<div class='meta'>${regions.size} ${t.regions}</div>")
         builder.append("</div>")
         if (!project.description.isNullOrBlank()) {
-            builder.append("<div class='info-section'><div class='info-label'>Description</div><div class='info-value'>${escapeHtml(project.description)}</div></div>")
+            builder.append("<div class='info-section'><div class='info-label'>${t.description}</div><div class='info-value'>${escapeHtml(project.description)}</div></div>")
         }
         if (!project.type1.isNullOrBlank()) {
-            builder.append("<div class='info-section'><div class='info-label'>Type 1</div><div class='info-value'>${escapeHtml(project.type1)}</div></div>")
+            builder.append("<div class='info-section'><div class='info-label'>${t.type1}</div><div class='info-value'>${escapeHtml(project.type1)}</div></div>")
         }
         if (!project.type2.isNullOrBlank()) {
-            builder.append("<div class='info-section'><div class='info-label'>Type 2</div><div class='info-value'>${escapeHtml(project.type2)}</div></div>")
+            builder.append("<div class='info-section'><div class='info-label'>${t.type2}</div><div class='info-value'>${escapeHtml(project.type2)}</div></div>")
         }
         if (!project.note.isNullOrBlank()) {
-            builder.append("<div class='info-section'><div class='info-label'>Note</div><div class='info-value'>${escapeHtml(project.note)}</div></div>")
+            builder.append("<div class='info-section'><div class='info-label'>${t.note}</div><div class='info-value'>${escapeHtml(project.note)}</div></div>")
         }
-        builder.append("<span class='photo-link' onclick='showPhotoWithAreas()'>📷 View photo with areas</span>")
+        builder.append("<span class='photo-link' onclick='showPhotoWithAreas()'>${t.viewPhotoWithAreas}</span>")
         builder.append("</div>")
         builder.append("</div>")
         builder.append("</div>")
@@ -781,23 +789,29 @@ class ExportManager @Inject constructor(
         // Right column (Part 3: Media panel)
         builder.append("<div class='right-column'>")
         builder.append("<div class='panel media-panel'>")
-        builder.append("<div class='panel-header'><span>Media Content</span><span id='mediaCount'>0 items</span></div>")
+        builder.append("<div class='panel-header'><span>${t.mediaContent}</span><span id='mediaCount'>0 ${t.items}</span></div>")
         // Media grid
         builder.append("<div class='panel-content' id='mediaContent'>")
-        builder.append("<div class='empty-state'><div class='empty-state-icon'>📷</div><div>Select a region to view media content</div></div>")
+        builder.append("<div class='empty-state'><div class='empty-state-icon'>📷</div><div>${t.selectRegionToViewMedia}</div></div>")
         builder.append("</div>")
         // Media viewer (hidden by default)
         builder.append("<div class='media-viewer' id='mediaViewer'>")
         builder.append("<div class='viewer-header'>")
-        builder.append("<span class='viewer-title' id='viewerTitle'>Photo</span>")
+        builder.append("<span class='viewer-title' id='viewerTitle'>${t.photo}</span>")
         builder.append("<div class='viewer-nav'>")
-        builder.append("<button class='viewer-btn' id='btnPrev' onclick='navigateMedia(-1)'>◀ Prev</button>")
-        builder.append("<button class='viewer-btn' id='btnNext' onclick='navigateMedia(1)'>Next ▶</button>")
-        builder.append("<button class='viewer-btn' onclick='closeViewer()'>✕ Back to Grid</button>")
+        builder.append("<button class='viewer-btn' id='btnPrev' onclick='navigateMedia(-1)'>${t.prev}</button>")
+        builder.append("<button class='viewer-btn' id='btnNext' onclick='navigateMedia(1)'>${t.next}</button>")
+        builder.append("<button class='viewer-btn' onclick='closeViewer()'>${t.backToGrid}</button>")
         builder.append("</div>")
         builder.append("</div>")
         builder.append("<div class='viewer-content' id='viewerContent'></div>")
         builder.append("<div class='viewer-footer'>")
+        builder.append("<div class='zoom-controls'>")
+        builder.append("<button class='zoom-btn' onclick='zoomOut()' title='Zoom Out'>${t.zoomOut}</button>")
+        builder.append("<span class='zoom-level' id='zoomLevel'>100%</span>")
+        builder.append("<button class='zoom-btn' onclick='zoomIn()' title='Zoom In'>${t.zoomIn}</button>")
+        builder.append("<button class='zoom-btn' onclick='resetZoom()' title='Reset'>${t.resetZoom}</button>")
+        builder.append("</div>")
         builder.append("<span class='viewer-counter' id='viewerCounter'>1 / 1</span>")
         builder.append("</div>")
         builder.append("</div>")
@@ -849,23 +863,23 @@ class ExportManager @Inject constructor(
         builder.append("infoContent.innerHTML=")
         builder.append("'<div class=\\'project-header\\'>'")
         builder.append("+'<h1>${escapeJs(project.name)}</h1>'")
-        builder.append("+'<div class=\\'meta\\'>${regions.size} regions</div>'")
+        builder.append("+'<div class=\\'meta\\'>${regions.size} ${t.regions}</div>'")
         builder.append("+'</div>'")
         if (!project.description.isNullOrBlank()) {
-            builder.append("+'<div class=\\'info-section\\'><div class=\\'info-label\\'>Description</div><div class=\\'info-value\\'>${escapeJs(project.description)}</div></div>'")
+            builder.append("+'<div class=\\'info-section\\'><div class=\\'info-label\\'>${t.description}</div><div class=\\'info-value\\'>${escapeJs(project.description)}</div></div>'")
         }
         if (!project.type1.isNullOrBlank()) {
-            builder.append("+'<div class=\\'info-section\\'><div class=\\'info-label\\'>Type 1</div><div class=\\'info-value\\'>${escapeJs(project.type1)}</div></div>'")
+            builder.append("+'<div class=\\'info-section\\'><div class=\\'info-label\\'>${t.type1}</div><div class=\\'info-value\\'>${escapeJs(project.type1)}</div></div>'")
         }
         if (!project.type2.isNullOrBlank()) {
-            builder.append("+'<div class=\\'info-section\\'><div class=\\'info-label\\'>Type 2</div><div class=\\'info-value\\'>${escapeJs(project.type2)}</div></div>'")
+            builder.append("+'<div class=\\'info-section\\'><div class=\\'info-label\\'>${t.type2}</div><div class=\\'info-value\\'>${escapeJs(project.type2)}</div></div>'")
         }
         if (!project.note.isNullOrBlank()) {
-            builder.append("+'<div class=\\'info-section\\'><div class=\\'info-label\\'>Note</div><div class=\\'info-value\\'>${escapeJs(project.note)}</div></div>'")
+            builder.append("+'<div class=\\'info-section\\'><div class=\\'info-label\\'>${t.note}</div><div class=\\'info-value\\'>${escapeJs(project.note)}</div></div>'")
         }
-        builder.append("+'<span class=\\'photo-link\\' onclick=\\'showPhotoWithAreas()\\'>📷 View photo with areas</span>';")
-        builder.append("document.getElementById('mediaContent').innerHTML='<div class=\\'empty-state\\'><div class=\\'empty-state-icon\\'>📷</div><div>Select a region to view media content</div></div>';")
-        builder.append("document.getElementById('mediaCount').textContent='0 items';")
+        builder.append("+'<span class=\\'photo-link\\' onclick=\\'showPhotoWithAreas()\\'>${t.viewPhotoWithAreas}</span>';")
+        builder.append("document.getElementById('mediaContent').innerHTML='<div class=\\'empty-state\\'><div class=\\'empty-state-icon\\'>📷</div><div>${t.selectRegionToViewMedia}</div></div>';")
+        builder.append("document.getElementById('mediaCount').textContent='0 ${t.items}';")
         builder.append("}")
         // Show photo with areas
         builder.append("function showPhotoWithAreas(){")
@@ -887,17 +901,17 @@ class ExportManager @Inject constructor(
         builder.append("const infoContent=document.getElementById('infoContent');")
         builder.append("let infoHtml=")
         builder.append("'<div class=\\'info-section\\'>'")
-        builder.append("+'<div class=\\'info-label\\'>Region Name</div>'")
+        builder.append("+'<div class=\\'info-label\\'>${t.regionName}</div>'")
         builder.append("+'<div class=\\'info-value\\' style=\\'font-size:18px;font-weight:600;\\'>'+r.name+'</div>'")
         builder.append("+'</div>'")
         builder.append("+'<div class=\\'info-section\\'>'")
-        builder.append("+'<div class=\\'info-label\\'>State</div>'")
+        builder.append("+'<div class=\\'info-label\\'>${t.state}</div>'")
         builder.append("+'<div class=\\'info-value\\'><span class=\\'color-indicator\\' style=\\'background-color:'+r.stateColor+';margin-right:8px;\\'></span>'+r.stateName+'</div>'")
         builder.append("+'</div>'")
-        builder.append("+(r.type1?'<div class=\\'info-section\\'><div class=\\'info-label\\'>Type 1</div><div class=\\'info-value\\'>'+r.type1+'</div></div>':'')")
-        builder.append("+(r.type2?'<div class=\\'info-section\\'><div class=\\'info-label\\'>Type 2</div><div class=\\'info-value\\'>'+r.type2+'</div></div>':'')")
-        builder.append("+(r.description?'<div class=\\'info-section\\'><div class=\\'info-label\\'>Description</div><div class=\\'info-value\\'>'+r.description+'</div></div>':'')")
-        builder.append("+(r.note?'<div class=\\'info-section\\'><div class=\\'info-label\\'>Note</div><div class=\\'info-value\\'>'+r.note+'</div></div>':'');")
+        builder.append("+(r.type1?'<div class=\\'info-section\\'><div class=\\'info-label\\'>${t.type1}</div><div class=\\'info-value\\'>'+r.type1+'</div></div>':'')")
+        builder.append("+(r.type2?'<div class=\\'info-section\\'><div class=\\'info-label\\'>${t.type2}</div><div class=\\'info-value\\'>'+r.type2+'</div></div>':'')")
+        builder.append("+(r.description?'<div class=\\'info-section\\'><div class=\\'info-label\\'>${t.description}</div><div class=\\'info-value\\'>'+r.description+'</div></div>':'')")
+        builder.append("+(r.note?'<div class=\\'info-section\\'><div class=\\'info-label\\'>${t.note}</div><div class=\\'info-value\\'>'+r.note+'</div></div>':'');")
         builder.append("infoContent.innerHTML=infoHtml;")
         // Update media panel
         builder.append("updateMediaPanel(r);")
@@ -906,9 +920,9 @@ class ExportManager @Inject constructor(
         builder.append("function updateMediaPanel(region){")
         builder.append("const mediaContent=document.getElementById('mediaContent');")
         builder.append("currentMediaList=region.contents||[];")
-        builder.append("document.getElementById('mediaCount').textContent=currentMediaList.length+' item'+(currentMediaList.length!==1?'s':'');")
+        builder.append("document.getElementById('mediaCount').textContent=currentMediaList.length+' ${t.item}'+(currentMediaList.length!==1?'s':'');")
         builder.append("if(currentMediaList.length===0){")
-        builder.append("mediaContent.innerHTML='<div class=\\'empty-state\\'><div class=\\'empty-state-icon\\'>📷</div><div>No media content for this region</div></div>';")
+        builder.append("mediaContent.innerHTML='<div class=\\'empty-state\\'><div class=\\'empty-state-icon\\'>📷</div><div>${t.noMediaForRegion}</div></div>';")
         builder.append("return;")
         builder.append("}")
         builder.append("let html='<div class=\\'media-grid\\'>';")
@@ -932,12 +946,14 @@ class ExportManager @Inject constructor(
         builder.append("if(currentMediaList.length===0)return;")
         builder.append("document.getElementById('mediaContent').style.display='none';")
         builder.append("document.getElementById('mediaViewer').classList.add('active');")
+        builder.append("resetZoom();")
         builder.append("updateViewerContent();")
         builder.append("}")
         // Close viewer
         builder.append("function closeViewer(){")
         builder.append("document.getElementById('mediaViewer').classList.remove('active');")
         builder.append("document.getElementById('mediaContent').style.display='block';")
+        builder.append("resetZoom();")
         builder.append("}")
         // Update viewer content
         builder.append("function updateViewerContent(){")
@@ -962,6 +978,7 @@ class ExportManager @Inject constructor(
         builder.append("const newIndex=currentMediaIndex+direction;")
         builder.append("if(newIndex>=0&&newIndex<currentMediaList.length){")
         builder.append("currentMediaIndex=newIndex;")
+        builder.append("resetZoom();")
         builder.append("updateViewerContent();")
         builder.append("}")
         builder.append("}")
@@ -979,12 +996,35 @@ class ExportManager @Inject constructor(
         builder.append("});")
         builder.append("document.getElementById('regionCount').textContent=visibleCount+' region'+(visibleCount!==1?'s':'');")
         builder.append("}")
+        // Zoom functions
+        builder.append("let currentZoom=1;")
+        builder.append("const zoomStep=0.25;")
+        builder.append("const minZoom=0.25;")
+        builder.append("const maxZoom=4;")
+        builder.append("function updateZoom(){")
+        builder.append("const img=document.querySelector('#viewerContent img');")
+        builder.append("if(img){")
+        builder.append("img.style.transform='scale('+currentZoom+')';")
+        builder.append("img.classList.toggle('zoomed',currentZoom!==1);")
+        builder.append("document.getElementById('zoomLevel').textContent=Math.round(currentZoom*100)+'%';")
+        builder.append("}")
+        builder.append("}")
+        builder.append("function zoomIn(){")
+        builder.append("if(currentZoom<maxZoom){currentZoom=Math.min(maxZoom,currentZoom+zoomStep);updateZoom();}")
+        builder.append("}")
+        builder.append("function zoomOut(){")
+        builder.append("if(currentZoom>minZoom){currentZoom=Math.max(minZoom,currentZoom-zoomStep);updateZoom();}")
+        builder.append("}")
+        builder.append("function resetZoom(){currentZoom=1;updateZoom();}")
         // Keyboard navigation
         builder.append("document.addEventListener('keydown',function(e){")
         builder.append("if(!document.getElementById('mediaViewer').classList.contains('active'))return;")
         builder.append("if(e.key==='ArrowLeft')navigateMedia(-1);")
         builder.append("else if(e.key==='ArrowRight')navigateMedia(1);")
         builder.append("else if(e.key==='Escape')closeViewer();")
+        builder.append("else if(e.key==='+'||e.key==='=')zoomIn();")
+        builder.append("else if(e.key==='-')zoomOut();")
+        builder.append("else if(e.key==='0')resetZoom();")
         builder.append("});")
         // Vertical resizer (left-right column)
         builder.append("(function(){")
@@ -1311,7 +1351,7 @@ class ExportManager @Inject constructor(
     /**
      * Export project as HTML report in ZIP file (for viewing on PC).
      */
-    suspend fun exportForPCToZip(project: Project, outputFile: File): ZipExportResult {
+    suspend fun exportForPCToZip(project: Project, outputFile: File, languageCode: String = "ru"): ZipExportResult {
         return withContext(Dispatchers.IO) {
             try {
                 val tempDir = File(context.cacheDir, "export_pc_${System.currentTimeMillis()}")
@@ -1379,7 +1419,7 @@ class ExportManager @Inject constructor(
                 }
                 
                 // Create HTML report with content data
-                val htmlContent = generateHtmlReportWithContents(project, regions, states, regionContentsMap)
+                val htmlContent = generateHtmlReportWithContents(project, regions, states, regionContentsMap, languageCode)
                 File(tempDir, "report.html").writeText(htmlContent)
                 
                 // Pack everything into ZIP
@@ -1406,7 +1446,7 @@ class ExportManager @Inject constructor(
     /**
      * Export all projects as a single HTML report in one ZIP file (for viewing on PC).
      */
-    suspend fun exportAllProjectsForPC(outputFile: File): ZipExportResult {
+    suspend fun exportAllProjectsForPC(outputFile: File, languageCode: String = "ru"): ZipExportResult {
         return withContext(Dispatchers.IO) {
             try {
                 val tempDir = File(context.cacheDir, "export_all_${System.currentTimeMillis()}")
@@ -1492,7 +1532,7 @@ class ExportManager @Inject constructor(
                 }
                 
                 // Generate single HTML with all projects
-                val htmlContent = generateHtmlReportForAllProjects(allProjectsData, states)
+                val htmlContent = generateHtmlReportForAllProjects(allProjectsData, states, languageCode)
                 File(tempDir, "report.html").writeText(htmlContent)
                 
                 // Pack everything into ZIP
@@ -1528,13 +1568,155 @@ class ExportManager @Inject constructor(
         val path: String
     )
     
+    /**
+     * Translations for HTML report based on app language.
+     */
+    private data class HtmlTranslations(
+        val lang: String,
+        val htmlLang: String,
+        // Panel headers
+        val projectsAndRegions: String,
+        val regionDetails: String,
+        val mediaContent: String,
+        // Field labels
+        val regionName: String,
+        val state: String,
+        val type1: String,
+        val type2: String,
+        val description: String,
+        val note: String,
+        val regions: String,
+        // Photo link
+        val viewPhotoWithAreas: String,
+        // Media
+        val photo: String,
+        val video: String,
+        val items: String,
+        val item: String,
+        // Viewer
+        val prev: String,
+        val next: String,
+        val backToGrid: String,
+        // Empty states
+        val selectRegionToViewMedia: String,
+        val noMediaForRegion: String,
+        // Filter
+        val filterByState: String,
+        val allStates: String,
+        // Search
+        val searchPlaceholder: String,
+        // Zoom
+        val zoomIn: String,
+        val zoomOut: String,
+        val resetZoom: String
+    ) {
+        companion object {
+            fun forLanguage(languageCode: String): HtmlTranslations {
+                return when (languageCode) {
+                    "ru" -> HtmlTranslations(
+                        lang = "ru",
+                        htmlLang = "ru",
+                        projectsAndRegions = "Структура",
+                        regionDetails = "Описание",
+                        mediaContent = "Мультимедиа",
+                        regionName = "Название области",
+                        state = "Состояние",
+                        type1 = "Тип 1",
+                        type2 = "Тип 2",
+                        description = "Описание",
+                        note = "Заметка",
+                        regions = "областей",
+                        viewPhotoWithAreas = "📷 Фото с областями",
+                        photo = "Фото",
+                        video = "Видео",
+                        items = "элементов",
+                        item = "элемент",
+                        prev = "◀ Назад",
+                        next = "Вперёд ▶",
+                        backToGrid = "✕ К галерее",
+                        selectRegionToViewMedia = "Выберите область для просмотра медиа",
+                        noMediaForRegion = "Нет медиа для этой области",
+                        filterByState = "Фильтр по состоянию:",
+                        allStates = "Все состояния",
+                        searchPlaceholder = "Поиск...",
+                        zoomIn = "🔍+",
+                        zoomOut = "🔍-",
+                        resetZoom = "↺ Сброс"
+                    )
+                    "zh" -> HtmlTranslations(
+                        lang = "zh",
+                        htmlLang = "zh-CN",
+                        projectsAndRegions = "结构",
+                        regionDetails = "描述",
+                        mediaContent = "多媒体",
+                        regionName = "区域名称",
+                        state = "状态",
+                        type1 = "类型 1",
+                        type2 = "类型 2",
+                        description = "描述",
+                        note = "备注",
+                        regions = "个区域",
+                        viewPhotoWithAreas = "📷 查看带区域的照片",
+                        photo = "照片",
+                        video = "视频",
+                        items = "项",
+                        item = "项",
+                        prev = "◀ 上一个",
+                        next = "下一个 ▶",
+                        backToGrid = "✕ 返回",
+                        selectRegionToViewMedia = "选择区域以查看媒体内容",
+                        noMediaForRegion = "此区域没有媒体内容",
+                        filterByState = "按状态筛选：",
+                        allStates = "所有状态",
+                        searchPlaceholder = "搜索...",
+                        zoomIn = "🔍+",
+                        zoomOut = "🔍-",
+                        resetZoom = "↺ 重置"
+                    )
+                    else -> HtmlTranslations(
+                        lang = "en",
+                        htmlLang = "en",
+                        projectsAndRegions = "Projects & Regions",
+                        regionDetails = "Region Details",
+                        mediaContent = "Media Content",
+                        regionName = "Region Name",
+                        state = "State",
+                        type1 = "Type 1",
+                        type2 = "Type 2",
+                        description = "Description",
+                        note = "Note",
+                        regions = "regions",
+                        viewPhotoWithAreas = "📷 View photo with areas",
+                        photo = "Photo",
+                        video = "Video",
+                        items = "items",
+                        item = "item",
+                        prev = "◀ Prev",
+                        next = "Next ▶",
+                        backToGrid = "✕ Back to Grid",
+                        selectRegionToViewMedia = "Select a region to view media content",
+                        noMediaForRegion = "No media content for this region",
+                        filterByState = "Filter by State:",
+                        allStates = "All States",
+                        searchPlaceholder = "Search...",
+                        zoomIn = "🔍+",
+                        zoomOut = "🔍-",
+                        resetZoom = "↺ Reset"
+                    )
+                }
+            }
+        }
+    }
+    
     private fun generateHtmlReportForAllProjects(
         allProjectsData: List<AllProjectData>,
-        states: List<State>
+        states: List<State>,
+        languageCode: String = "ru"
     ): String {
+        val t = HtmlTranslations.forLanguage(languageCode)
         val builder = StringBuilder()
         builder.append("<!DOCTYPE html>")
-        builder.append("<html lang='en'>")
+        builder.append("<html lang='${t.htmlLang}'>")
         builder.append("<head>")
         builder.append("<meta charset='UTF-8'>")
         builder.append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
