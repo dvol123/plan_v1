@@ -93,8 +93,9 @@ dependencies {
     // Image Loading - Coil
     implementation("io.coil-kt:coil-compose:2.5.0")
     
-    // PhotoView for zoom
-    implementation("com.github.chrisbanes:PhotoView:2.3.0")
+    // Zoomable library for pinch-to-zoom with HorizontalPager support
+    // https://github.com/usuiat/Zoomable
+    implementation("net.engawapg.lib:zoomable:1.7.0")
     
     // Gson for JSON
     implementation("com.google.code.gson:gson:2.10.1")
