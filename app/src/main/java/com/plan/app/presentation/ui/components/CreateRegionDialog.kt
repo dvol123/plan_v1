@@ -255,7 +255,7 @@ fun CreateRegionDialog(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "New: $stateText",
+                                text = stringResource(R.string.new_state_preview, stateText),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }

@@ -264,7 +264,7 @@ fun MainScreen(
         AlertDialog(
             onDismissRequest = { showExportDialog = false },
             title = { Text(stringResource(R.string.export_project)) },
-            text = { Text("Choose what to export") },
+            text = { Text(stringResource(R.string.choose_what_to_export)) },
             confirmButton = {
                 TextButton(onClick = {
                     showExportDialog = false
@@ -274,7 +274,7 @@ fun MainScreen(
                         exportAllLauncher.launch("all_projects.zip")
                     }
                 }) {
-                    Text(if (uiState.selectedProject != null) "Export selected" else "Export all")
+                    Text(if (uiState.selectedProject != null) stringResource(R.string.export_selected) else stringResource(R.string.export_all))
                 }
             },
             dismissButton = {
@@ -290,17 +290,17 @@ fun MainScreen(
         AlertDialog(
             onDismissRequest = { showShareDialog = false },
             title = { Text(stringResource(R.string.share)) },
-            text = { Text("Choose what to share") },
+            text = { Text(stringResource(R.string.choose_what_to_share)) },
             confirmButton = {
                 TextButton(onClick = {
                     showShareDialog = false
                     if (uiState.selectedProject != null) {
                         shareLauncher.launch("${uiState.selectedProject!!.name}_share.zip")
                     } else {
-                        Toast.makeText(context, "Select a project first", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.select_project_first), Toast.LENGTH_SHORT).show()
                     }
                 }) {
-                    Text(if (uiState.selectedProject != null) "Share selected" else "Select project first")
+                    Text(if (uiState.selectedProject != null) stringResource(R.string.share_selected) else stringResource(R.string.select_project_first))
                 }
             },
             dismissButton = {
@@ -313,7 +313,7 @@ fun MainScreen(
                         showShareDialog = false
                         shareAllLauncher.launch("all_projects_share.zip")
                     }) {
-                        Text("Share all")
+                        Text(stringResource(R.string.share_all))
                     }
                 }
             }

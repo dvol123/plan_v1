@@ -109,6 +109,14 @@
     <string name="share_project">Поделиться проектом</string>
     <string name="export_selected">Экспортировать выбранный</string>
     <string name="export_all">Экспортировать все</string>
+    <string name="share_selected">Поделиться выбранным</string>
+    <string name="share_all">Поделиться всеми</string>
+    <string name="choose_what_to_export">Выберите что экспортировать</string>
+    <string name="choose_what_to_share">Выберите чем поделиться</string>
+    <string name="select_project_first">Сначала выберите проект</string>
+    <string name="new_state_preview">Новое: %s</string>
+    <string name="invalid_import_file">Неверный файл импорта</string>
+    <string name="import_wrong_format">Этот файл является HTML-отчётом, а не резервной копией. Используйте Обмен (не Экспорт) для создания резервных копий.</string>
     
     <!-- Common -->
     <string name="create">Создать</string>

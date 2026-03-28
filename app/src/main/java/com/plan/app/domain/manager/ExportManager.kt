@@ -1071,6 +1071,7 @@ class ExportManager @Inject constructor(
                 val regionsData = mutableListOf<Pair<RegionExportData, Long>>()
                 val mediaFiles = mutableMapOf<String, File>()
                 var photoFile: File? = null
+                var hasReportHtml = false  // Track if this is an HTML report (not importable)
                 
                 ZipInputStream(tempZipFile.inputStream()).use { zipIn ->
                     var entry = zipIn.nextEntry
@@ -1098,6 +1099,9 @@ class ExportManager @Inject constructor(
                                 val regionData = gson.fromJson(content, RegionExportData::class.java)
                                 regionsData.add(Pair(regionData, System.currentTimeMillis()))
                             }
+                            entry.name == "report.html" -> {
+                                hasReportHtml = true
+                            }
                         }
                         zipIn.closeEntry()
                         entry = zipIn.nextEntry
@@ -1107,6 +1111,13 @@ class ExportManager @Inject constructor(
                 tempZipFile.delete()
                 
                 if (projectData == null) {
+                    // Check if this is an HTML report (export for PC) instead of a backup
+                    if (hasReportHtml) {
+                        return@withContext ImportResult(
+                            success = false, 
+                            error = "This file is an HTML report, not a project backup. Use Share (not Export) to create importable backups."
+                        )
+                    }
                     return@withContext ImportResult(success = false, error = "Invalid project file: missing project.json")
                 }
                 

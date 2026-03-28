@@ -109,6 +109,14 @@
     <string name="share_project">Share Project</string>
     <string name="export_selected">Export selected</string>
     <string name="export_all">Export all</string>
+    <string name="share_selected">Share selected</string>
+    <string name="share_all">Share all</string>
+    <string name="choose_what_to_export">Choose what to export</string>
+    <string name="choose_what_to_share">Choose what to share</string>
+    <string name="select_project_first">Select a project first</string>
+    <string name="new_state_preview">New: %s</string>
+    <string name="invalid_import_file">Invalid import file</string>
+    <string name="import_wrong_format">This file is an HTML report, not a project backup. Use Share (not Export) to create importable backups.</string>
     
     <!-- Common -->
     <string name="create">Create</string>

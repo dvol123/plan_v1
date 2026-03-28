@@ -109,6 +109,14 @@
     <string name="share_project">分享项目</string>
     <string name="export_selected">导出所选</string>
     <string name="export_all">导出全部</string>
+    <string name="share_selected">分享所选</string>
+    <string name="share_all">分享全部</string>
+    <string name="choose_what_to_export">选择要导出的内容</string>
+    <string name="choose_what_to_share">选择要分享的内容</string>
+    <string name="select_project_first">请先选择项目</string>
+    <string name="new_state_preview">新建：%s</string>
+    <string name="invalid_import_file">导入文件无效</string>
+    <string name="import_wrong_format">此文件是HTML报告，不是项目备份。请使用分享（而非导出）功能创建可导入的备份。</string>
     
     <!-- Common -->
     <string name="create">创建</string>
