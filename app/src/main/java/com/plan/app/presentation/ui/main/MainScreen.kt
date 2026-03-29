@@ -95,12 +95,17 @@ fun MainScreen(
         }
     }
     
-    // Photo picker launcher
+    // Photo picker launcher - use OpenDocument for persistent URI permission
     val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        selectedPhotoUri = uri
-        if (uri != null) {
+        uri?.let {
+            // Take persistent URI permission so the image survives app restart
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            selectedPhotoUri = uri
             viewModel.showCreateDialog()
         }
     }
@@ -464,7 +469,7 @@ fun MainScreen(
                         DropdownMenuItem(
                             onClick = {
                                 showAddMenu = false
-                                photoPickerLauncher.launch("image/*")
+                                photoPickerLauncher.launch(arrayOf("image/*"))
                             },
                             text = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {

@@ -1,5 +1,6 @@
 package com.plan.app.presentation.ui.components
 
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -58,17 +59,29 @@ fun RegionCardBottomSheet(
     var description by remember { mutableStateOf(region.description ?: "") }
     var note by remember { mutableStateOf(region.note ?: "") }
     
-    // Media picker launchers
+    // Media picker launchers - use OpenDocument for persistent URI permission
     val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        uri?.let { onAddPhoto(it) }
+        uri?.let {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            onAddPhoto(it)
+        }
     }
     
     val videoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        uri?.let { onAddVideo(it) }
+        uri?.let {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            onAddVideo(it)
+        }
     }
     
     ModalBottomSheet(
@@ -130,7 +143,7 @@ fun RegionCardBottomSheet(
                             AddMediaButton(
                                 text = stringResource(R.string.add_photo),
                                 icon = Icons.Default.AddAPhoto,
-                                onClick = { photoPicker.launch("image/*") }
+                                onClick = { photoPicker.launch(arrayOf("image/*")) }
                             )
                         }
                         
@@ -138,7 +151,7 @@ fun RegionCardBottomSheet(
                             AddMediaButton(
                                 text = stringResource(R.string.add_video),
                                 icon = Icons.Default.VideoCall,
-                                onClick = { videoPicker.launch("video/*") }
+                                onClick = { videoPicker.launch(arrayOf("video/*")) }
                             )
                         }
                     }

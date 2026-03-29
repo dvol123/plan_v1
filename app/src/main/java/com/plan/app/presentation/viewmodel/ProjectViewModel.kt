@@ -24,6 +24,8 @@ import com.plan.app.domain.usecase.ManageProjectUseCase
 import com.plan.app.domain.usecase.ManageRegionUseCase
 import com.plan.app.domain.usecase.ManageStateUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import com.plan.app.presentation.ui.components.AppPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -65,6 +67,7 @@ data class ProjectUiState(
 @HiltViewModel
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ProjectViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val manageProjectUseCase: ManageProjectUseCase,
     private val regionRepository: RegionRepository,
     private val manageRegionUseCase: ManageRegionUseCase,
@@ -634,7 +637,8 @@ class ProjectViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val project = _uiState.value.project ?: return@launch
-                val result = exportManager.exportForPCToZip(project, outputFile)
+                val languageCode = AppPreferences.getLanguage(context)
+                val result = exportManager.exportForPCToZip(project, outputFile, languageCode)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     exportSuccess = result.success,

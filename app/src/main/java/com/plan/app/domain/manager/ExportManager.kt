@@ -1607,6 +1607,7 @@ class ExportManager @Inject constructor(
         val allStates: String,
         // Search
         val searchPlaceholder: String,
+        val noResultsFound: String,
         // Zoom
         val zoomIn: String,
         val zoomOut: String,
@@ -1643,6 +1644,7 @@ class ExportManager @Inject constructor(
                         filterByState = "Фильтр по состоянию:",
                         allStates = "Все состояния",
                         searchPlaceholder = "Поиск...",
+                        noResultsFound = "Ничего не найдено",
                         zoomIn = "🔍+",
                         zoomOut = "🔍-",
                         resetZoom = "↺ Сброс"
@@ -1675,6 +1677,7 @@ class ExportManager @Inject constructor(
                         filterByState = "按状态筛选：",
                         allStates = "所有状态",
                         searchPlaceholder = "搜索...",
+                        noResultsFound = "未找到结果",
                         zoomIn = "🔍+",
                         zoomOut = "🔍-",
                         resetZoom = "↺ 重置"
@@ -1707,6 +1710,7 @@ class ExportManager @Inject constructor(
                         filterByState = "Filter by State:",
                         allStates = "All States",
                         searchPlaceholder = "Search...",
+                        noResultsFound = "No results found",
                         zoomIn = "🔍+",
                         zoomOut = "🔍-",
                         resetZoom = "↺ Reset"
@@ -1993,7 +1997,8 @@ class ExportManager @Inject constructor(
         builder.append("items:'${escapeJs(t.items)}',")
         builder.append("noMediaForRegion:'${escapeJs(t.noMediaForRegion)}',")
         builder.append("noPhotoAvailable:'${escapeJs(t.noPhotoAvailable)}',")
-        builder.append("viewPhotoWithAreas:'${escapeJs(t.viewPhotoWithAreas)}'")
+        builder.append("viewPhotoWithAreas:'${escapeJs(t.viewPhotoWithAreas)}',")
+        builder.append("noResultsFound:'${escapeJs(t.noResultsFound)}'")
         builder.append("};")
         // Update total count
         builder.append("(function(){")
@@ -2019,7 +2024,7 @@ class ExportManager @Inject constructor(
         builder.append("});")
         builder.append("});")
         builder.append("if(results.length===0){")
-        builder.append("searchResults.innerHTML='<div class=\\'search-result-item\\' style=\\'color:#999;\\'>No results found</div>';")
+        builder.append("searchResults.innerHTML='<div class=\\'search-result-item\\' style=\\'color:#999;\\'>'+i18n.noResultsFound+'</div>';")
         builder.append("}else{")
         builder.append("let html='';")
         builder.append("results.slice(0,10).forEach(function(r){")
