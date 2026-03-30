@@ -38,7 +38,6 @@
     <string name="delete_media">Delete Media</string>
     <string name="delete_media_confirmation">Are you sure you want to delete this media file?</string>
     <string name="add_from_gallery">Add from Gallery</string>
-    <string name="import_project">Import</string>
     <string name="project_name">Name</string>
     <string name="project_name_label">Project: %s</string>
     <string name="type1">Type 1</string>
