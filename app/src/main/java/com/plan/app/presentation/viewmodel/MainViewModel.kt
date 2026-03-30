@@ -31,6 +31,7 @@ data class MainUiState(
     val showCreateDialog: Boolean = false,
     val showEditDialog: Boolean = false,
     val showDeleteConfirm: Boolean = false,
+    val showDeleteAllConfirm: Boolean = false,
     val showExportDialog: Boolean = false,
     val showSettingsDialog: Boolean = false,
     val errorMessage: String? = null,
@@ -169,6 +170,34 @@ class MainViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isLoading = false)
             }
         }
+    }
+    
+    fun deleteAllProjects() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                // Delete all regions first, then all projects
+                val allProjects = projects.value
+                for (project in allProjects) {
+                    manageRegionUseCase.deleteAllByProject(project.id)
+                    manageProjectUseCase.delete(project)
+                }
+                selectProject(null)
+                hideDeleteAllConfirm()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(errorMessage = e.message)
+            } finally {
+                _uiState.value = _uiState.value.copy(isLoading = false)
+            }
+        }
+    }
+    
+    fun showDeleteAllConfirm() {
+        _uiState.value = _uiState.value.copy(showDeleteAllConfirm = true)
+    }
+    
+    fun hideDeleteAllConfirm() {
+        _uiState.value = _uiState.value.copy(showDeleteAllConfirm = false)
     }
     
     // Export selected project to ZIP (for sharing - JSON format)

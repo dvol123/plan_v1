@@ -71,6 +71,7 @@ fun RegionCardDialog(
     onSave: (Region) -> Unit,
     onAddPhoto: (Uri) -> Unit,
     onAddVideo: (Uri) -> Unit,
+    onDeleteMedia: (Content) -> Unit = {},
     onCreateState: (String, Int) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
@@ -92,6 +93,10 @@ fun RegionCardDialog(
     var showCameraPermissionDenied by remember { mutableStateOf(false) }
     var pendingMediaType by remember { mutableStateOf<MediaType?>(null) }
     
+    // Media deletion state
+    var showDeleteMediaDialog by remember { mutableStateOf(false) }
+    var mediaToDelete by remember { mutableStateOf<Content?>(null) }
+    
     // Convert saved strings back to URIs
     val cameraImageUri = cameraImageUriString?.let { Uri.parse(it) }
     val cameraVideoUri = cameraVideoUriString?.let { Uri.parse(it) }
@@ -103,6 +108,32 @@ fun RegionCardDialog(
     // Get media contents
     val mediaContents = remember(region.contents) {
         region.contents.filter { it.type == ContentType.PHOTO || it.type == ContentType.VIDEO }
+    }
+    
+    // Gallery picker for photos
+    val photoGalleryPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            onAddPhoto(it)
+        }
+    }
+    
+    // Gallery picker for videos
+    val videoGalleryPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            onAddVideo(it)
+        }
     }
     
     // Camera launcher for photos - check file existence regardless of success flag
@@ -213,6 +244,40 @@ fun RegionCardDialog(
         )
     }
     
+    // Delete media confirmation dialog
+    if (showDeleteMediaDialog && mediaToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { 
+                showDeleteMediaDialog = false
+                mediaToDelete = null
+            },
+            title = { Text(stringResource(R.string.delete_media)) },
+            text = { Text(stringResource(R.string.delete_media_confirmation)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        mediaToDelete?.let { onDeleteMedia(it) }
+                        showDeleteMediaDialog = false
+                        mediaToDelete = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(stringResource(R.string.delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { 
+                    showDeleteMediaDialog = false
+                    mediaToDelete = null
+                }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+    
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -266,7 +331,14 @@ fun RegionCardDialog(
                             selectedMediaIndex = index
                             showFullscreenMedia = true
                         },
-                        onAddPhoto = {
+                        onMediaDoubleTap = { content ->
+                            // Double tap to delete (in editing mode)
+                            if (isEditing) {
+                                mediaToDelete = content
+                                showDeleteMediaDialog = true
+                            }
+                        },
+                        onAddPhotoFromCamera = {
                             pendingMediaType = MediaType.PHOTO
                             when (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)) {
                                 PackageManager.PERMISSION_GRANTED -> {
@@ -284,7 +356,10 @@ fun RegionCardDialog(
                                 }
                             }
                         },
-                        onAddVideo = {
+                        onAddPhotoFromGallery = {
+                            photoGalleryPicker.launch(arrayOf("image/*"))
+                        },
+                        onAddVideoFromCamera = {
                             pendingMediaType = MediaType.VIDEO
                             when (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)) {
                                 PackageManager.PERMISSION_GRANTED -> {
@@ -301,6 +376,9 @@ fun RegionCardDialog(
                                     cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                                 }
                             }
+                        },
+                        onAddVideoFromGallery = {
+                            videoGalleryPicker.launch(arrayOf("video/*"))
                         }
                     )
                     
@@ -435,8 +513,11 @@ private fun MediaGallerySection(
     mediaContents: List<Content>,
     isEditing: Boolean,
     onMediaClick: (Int) -> Unit,
-    onAddPhoto: () -> Unit,
-    onAddVideo: () -> Unit
+    onMediaDoubleTap: (Content) -> Unit,
+    onAddPhotoFromCamera: () -> Unit,
+    onAddPhotoFromGallery: () -> Unit,
+    onAddVideoFromCamera: () -> Unit,
+    onAddVideoFromGallery: () -> Unit
 ) {
     Column {
         Text(
@@ -459,7 +540,9 @@ private fun MediaGallerySection(
                 items(mediaContents.indices.toList()) { index ->
                     MediaThumbnail(
                         content = mediaContents[index],
-                        onClick = { onMediaClick(index) }
+                        onClick = { onMediaClick(index) },
+                        onDoubleTap = { onMediaDoubleTap(mediaContents[index]) },
+                        isEditing = isEditing
                     )
                 }
             }

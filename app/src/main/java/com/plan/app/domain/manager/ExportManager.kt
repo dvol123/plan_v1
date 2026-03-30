@@ -1611,7 +1611,10 @@ class ExportManager @Inject constructor(
         // Zoom
         val zoomIn: String,
         val zoomOut: String,
-        val resetZoom: String
+        val resetZoom: String,
+        // Search result types
+        val projectType: String,
+        val regionType: String
     ) {
         companion object {
             fun forLanguage(languageCode: String): HtmlTranslations {
@@ -1647,7 +1650,9 @@ class ExportManager @Inject constructor(
                         noResultsFound = "Ничего не найдено",
                         zoomIn = "🔍+",
                         zoomOut = "🔍-",
-                        resetZoom = "↺ Сброс"
+                        resetZoom = "↺ Сброс",
+                        projectType = "проект",
+                        regionType = "область"
                     )
                     "zh" -> HtmlTranslations(
                         lang = "zh",
@@ -1680,7 +1685,9 @@ class ExportManager @Inject constructor(
                         noResultsFound = "未找到结果",
                         zoomIn = "🔍+",
                         zoomOut = "🔍-",
-                        resetZoom = "↺ 重置"
+                        resetZoom = "↺ 重置",
+                        projectType = "项目",
+                        regionType = "区域"
                     )
                     else -> HtmlTranslations(
                         lang = "en",
@@ -1713,7 +1720,9 @@ class ExportManager @Inject constructor(
                         noResultsFound = "No results found",
                         zoomIn = "🔍+",
                         zoomOut = "🔍-",
-                        resetZoom = "↺ Reset"
+                        resetZoom = "↺ Reset",
+                        projectType = "project",
+                        regionType = "region"
                     )
                 }
             }
@@ -1998,7 +2007,9 @@ class ExportManager @Inject constructor(
         builder.append("noMediaForRegion:'${escapeJs(t.noMediaForRegion)}',")
         builder.append("noPhotoAvailable:'${escapeJs(t.noPhotoAvailable)}',")
         builder.append("viewPhotoWithAreas:'${escapeJs(t.viewPhotoWithAreas)}',")
-        builder.append("noResultsFound:'${escapeJs(t.noResultsFound)}'")
+        builder.append("noResultsFound:'${escapeJs(t.noResultsFound)}',")
+        builder.append("projectType:'${escapeJs(t.projectType)}',")
+        builder.append("regionType:'${escapeJs(t.regionType)}'")
         builder.append("};")
         // Update total count
         builder.append("(function(){")
@@ -2029,7 +2040,7 @@ class ExportManager @Inject constructor(
         builder.append("let html='';")
         builder.append("results.slice(0,10).forEach(function(r){")
         builder.append("html+='<div class=\\'search-result-item\\' onclick=\\'selectSearchResult('+r.projectIndex+','+r.regionIndex+')\\'>';")
-        builder.append("html+='<span class=\\'search-result-type '+r.type+'\\'>'+r.type+'</span>';")
+        builder.append("html+='<span class=\\'search-result-type '+r.type+'\\'>'+(r.type==='project'?i18n.projectType:i18n.regionType)+'</span>';")
         builder.append("html+='<span class=\\'search-result-name\\'>'+r.name+'</span>';")
         builder.append("if(r.parent)html+='<span class=\\'search-result-parent\\'>'+r.parent+'</span>';")
         builder.append("html+='</div>';")

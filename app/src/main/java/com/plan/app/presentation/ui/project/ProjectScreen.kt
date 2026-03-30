@@ -457,6 +457,9 @@ fun ProjectScreen(
                     viewModel.addVideoToRegion(context, region.id, uri)
                 }
             },
+            onDeleteMedia = { content ->
+                viewModel.deleteContent(content)
+            },
             onCreateState = { name, color ->
                 viewModel.createState(name, color) { newState ->
                     // Auto-select the newly created state for this region

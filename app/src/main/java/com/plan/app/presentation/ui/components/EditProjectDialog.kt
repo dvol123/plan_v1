@@ -18,6 +18,7 @@ fun EditProjectDialog(
     onSave: (Project) -> Unit,
     onDelete: () -> Unit
 ) {
+    var name by remember { mutableStateOf(project.name) }
     var type1 by remember { mutableStateOf(project.type1 ?: "") }
     var type2 by remember { mutableStateOf(project.type2 ?: "") }
     var description by remember { mutableStateOf(project.description ?: "") }
@@ -28,10 +29,13 @@ fun EditProjectDialog(
         title = { Text(stringResource(com.plan.app.R.string.edit_project)) },
         text = {
             Column {
-                Text(
-                    text = stringResource(com.plan.app.R.string.project_name_label, project.name),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                // Project name field - editable
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(com.plan.app.R.string.project_name_edit)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -80,6 +84,7 @@ fun EditProjectDialog(
         confirmButton = {
             TextButton(onClick = {
                 onSave(project.copy(
+                    name = name.trim(),
                     type1 = type1.trim().ifBlank { null },
                     type2 = type2.trim().ifBlank { null },
                     description = description.trim().ifBlank { null },

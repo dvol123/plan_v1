@@ -32,6 +32,12 @@
     <string name="edit_project">Редактировать проект</string>
     <string name="delete_project">Удалить проект</string>
     <string name="delete_project_confirmation">Вы уверены, что хотите удалить этот проект? Все области и медиа будут потеряны.</string>
+    <string name="delete_all_projects">Удалить все</string>
+    <string name="delete_all_projects_confirmation">Вы уверены, что хотите удалить ВСЕ проекты? Это действие нельзя отменить.</string>
+    <string name="project_name_edit">Название проекта</string>
+    <string name="delete_media">Удалить медиа</string>
+    <string name="delete_media_confirmation">Вы уверены, что хотите удалить этот медиафайл?</string>
+    <string name="add_from_gallery">Добавить из галереи</string>
     <string name="project_name">Название</string>
     <string name="project_name_label">Проект: %s</string>
     <string name="type1">Тип 1</string>

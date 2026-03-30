@@ -378,6 +378,19 @@ fun MainScreen(
                         DropdownMenuItem(
                             onClick = {
                                 showMenu = false
+                                viewModel.showDeleteAllConfirm()
+                            },
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.DeleteForever, contentDescription = null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.delete_all_projects))
+                                }
+                            }
+                        )
+                        DropdownMenuItem(
+                            onClick = {
+                                showMenu = false
                                 // Import
                                 importLauncher.launch("application/zip")
                             },
@@ -638,6 +651,29 @@ fun MainScreen(
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.hideDeleteConfirm() }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+    
+    // Delete All Projects Confirmation Dialog
+    if (uiState.showDeleteAllConfirm) {
+        AlertDialog(
+            onDismissRequest = { viewModel.hideDeleteAllConfirm() },
+            title = { Text(stringResource(R.string.delete_all_projects)) },
+            text = { Text(stringResource(R.string.delete_all_projects_confirmation)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteAllProjects()
+                    }
+                ) {
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.hideDeleteAllConfirm() }) {
                     Text(stringResource(R.string.cancel))
                 }
             }
