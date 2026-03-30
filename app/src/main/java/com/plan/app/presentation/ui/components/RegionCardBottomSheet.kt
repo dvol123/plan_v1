@@ -288,7 +288,9 @@ fun RegionCardBottomSheet(
 @Composable
 private fun MediaThumbnail(
     content: Content,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDoubleTap: () -> Unit = {},
+    isEditing: Boolean = false
 ) {
     Card(
         modifier = Modifier

@@ -1,6 +1,7 @@
 package com.plan.app.presentation.ui.components
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.view.ViewGroup
@@ -550,18 +551,20 @@ private fun MediaGallerySection(
             // Add buttons in editing mode
             if (isEditing) {
                 item {
-                    AddMediaButton(
+                    AddMediaButtonWithMenu(
                         text = stringResource(R.string.add_photo),
                         icon = Icons.Default.AddAPhoto,
-                        onClick = onAddPhoto
+                        onCameraClick = onAddPhotoFromCamera,
+                        onGalleryClick = onAddPhotoFromGallery
                     )
                 }
                 
                 item {
-                    AddMediaButton(
+                    AddMediaButtonWithMenu(
                         text = stringResource(R.string.add_video),
                         icon = Icons.Default.VideoCall,
-                        onClick = onAddVideo
+                        onCameraClick = onAddVideoFromCamera,
+                        onGalleryClick = onAddVideoFromGallery
                     )
                 }
             }
@@ -607,7 +610,9 @@ private fun MediaPlaceholder() {
 @Composable
 private fun MediaThumbnail(
     content: Content,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDoubleTap: () -> Unit = {},
+    isEditing: Boolean = false
 ) {
     Card(
         modifier = Modifier
@@ -683,6 +688,72 @@ private fun AddMediaButton(
                 text = text,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Composable
+private fun AddMediaButtonWithMenu(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onCameraClick: () -> Unit,
+    onGalleryClick: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    
+    Box {
+        Card(
+            modifier = Modifier
+                .size(80.dp)
+                .clickable { expanded = true },
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = text,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.take_photo)) },
+                onClick = {
+                    expanded = false
+                    onCameraClick()
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.PhotoCamera, contentDescription = null)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.add_from_gallery)) },
+                onClick = {
+                    expanded = false
+                    onGalleryClick()
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.PhotoLibrary, contentDescription = null)
+                }
             )
         }
     }
