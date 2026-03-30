@@ -729,7 +729,6 @@ class ExportManager @Inject constructor(
         builder.append("<select class='filter-select' id='stateFilter' onchange='filterByState(this.value)'>")
         builder.append("<option value=''>${t.allStates}</option>")
         for (state in states) {
-            val colorHex = "#${Integer.toHexString(state.color).substring(2).uppercase()}"
             builder.append("<option value='${state.id}'>${escapeHtml(state.name)}</option>")
         }
         builder.append("</select>")
@@ -1875,7 +1874,6 @@ class ExportManager @Inject constructor(
         for ((projectIndex, projectData) in allProjectsData.withIndex()) {
             val project = projectData.project
             val regions = projectData.regions
-            val totalContentCount = regions.sumOf { projectData.regionContentsMap[it.id]?.size ?: 0 }
             builder.append("<div class='tree-item project' data-project-id='${project.id}' data-project-index='$projectIndex' onclick='selectProject($projectIndex)'>")
             builder.append("<span class='tree-icon'>📁</span>")
             builder.append("<span style='flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>${escapeHtml(project.name)}</span>")
@@ -1949,7 +1947,7 @@ class ExportManager @Inject constructor(
         builder.append("<script>")
         // Projects data
         builder.append("const projectsData = [")
-        for ((projectIndex, projectData) in allProjectsData.withIndex()) {
+        for (projectData in allProjectsData) {
             val project = projectData.project
             val regions = projectData.regions
             builder.append("{")
@@ -1961,7 +1959,7 @@ class ExportManager @Inject constructor(
             builder.append("note:'${escapeJs(project.note ?: "")}',")
             builder.append("photoPath:'${escapeJs(projectData.photoPath ?: "")}',")
             builder.append("regions:[")
-            for ((regionIndex, region) in regions.withIndex()) {
+            for (region in regions) {
                 val state = region.stateId?.let { stateId -> states.find { it.id == stateId } }
                 val colorHex = if (state != null) "#${Integer.toHexString(state.color).substring(2).uppercase()}" else "#9e9e9e"
                 builder.append("{")

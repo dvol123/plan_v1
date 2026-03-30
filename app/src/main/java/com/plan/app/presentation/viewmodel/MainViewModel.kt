@@ -201,7 +201,7 @@ class MainViewModel @Inject constructor(
     }
     
     // Export selected project to ZIP (for sharing - JSON format)
-    fun exportProjectToZip(context: Context, outputFile: File, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
+    fun exportProjectToZip(_context: Context, outputFile: File, onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {

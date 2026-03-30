@@ -27,7 +27,7 @@ fun ZoomableImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Fit,
-    onSizeChanged: (IntSize) -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onSizeChanged: (IntSize) -> Unit = {},
     onDoubleTap: ((Offset) -> Unit)? = null,
     onSingleTap: ((Offset) -> Unit)? = null,
     isZoomEnabled: Boolean = true

@@ -109,11 +109,11 @@ class TransferManager @Inject constructor(
         _transferState.value = TransferState.Idle
     }
     
-    suspend fun connectToDevice(deviceAddress: String) {
+    suspend fun connectToDevice(_deviceAddress: String) {
         _transferState.value = TransferState.Error("Transfer feature not available in this version")
     }
     
-    suspend fun sendFile(file: java.io.File) {
+    suspend fun sendFile(_file: java.io.File) {
         _transferState.value = TransferState.Error("Transfer feature not available in this version")
     }
     

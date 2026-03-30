@@ -289,8 +289,8 @@ fun RegionCardBottomSheet(
 private fun MediaThumbnail(
     content: Content,
     onClick: () -> Unit,
-    onDoubleTap: () -> Unit = {},
-    isEditing: Boolean = false
+    @Suppress("UNUSED_PARAMETER") onDoubleTap: () -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") isEditing: Boolean = false
 ) {
     Card(
         modifier = Modifier

@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -140,7 +142,7 @@ fun RegionCardDialog(
     // Camera launcher for photos - check file existence regardless of success flag
     val photoCameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
-    ) { success ->
+    ) { _ ->
         // Check if file exists regardless of success flag
         // (success may be false on rotation, but file still exists)
         cameraImageUri?.let { uri ->
@@ -170,7 +172,7 @@ fun RegionCardDialog(
     // Camera launcher for videos - check file existence regardless of success flag
     val videoCameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CaptureVideo()
-    ) { success ->
+    ) { _ ->
         // Check if file exists regardless of success flag
         cameraVideoUri?.let { uri ->
             val fileExists = try {
@@ -611,8 +613,8 @@ private fun MediaPlaceholder() {
 private fun MediaThumbnail(
     content: Content,
     onClick: () -> Unit,
-    onDoubleTap: () -> Unit = {},
-    isEditing: Boolean = false
+    @Suppress("UNUSED_PARAMETER") onDoubleTap: () -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") isEditing: Boolean = false
 ) {
     Card(
         modifier = Modifier
@@ -1076,7 +1078,7 @@ private fun FullscreenMediaViewer(
                             .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                     ) {
                         Icon(
-                            Icons.Default.KeyboardArrowLeft,
+                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                             contentDescription = "Previous",
                             tint = Color.White,
                             modifier = Modifier.size(40.dp)
@@ -1099,7 +1101,7 @@ private fun FullscreenMediaViewer(
                             .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                     ) {
                         Icon(
-                            Icons.Default.KeyboardArrowRight,
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
                             contentDescription = "Next",
                             tint = Color.White,
                             modifier = Modifier.size(40.dp)

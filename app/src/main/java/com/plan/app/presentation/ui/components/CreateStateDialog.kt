@@ -121,6 +121,7 @@ fun CreateStateDialog(
                 }
                 
                 // Color picker (shown when creating new state - name entered and no exact match)
+                @Suppress("KotlinConstantConditions")
                 if (stateName.isNotBlank() && exactMatch == null) {
                     Text(
                         text = stringResource(R.string.select_color),

@@ -19,6 +19,7 @@ import javax.inject.Singleton
 /**
  * Implementation of RegionRepository.
  */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @Singleton
 class RegionRepositoryImpl @Inject constructor(
     private val regionDao: RegionDao,

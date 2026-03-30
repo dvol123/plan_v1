@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -200,7 +201,7 @@ fun ProjectScreen(
                     },
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     },
                     actions = {
@@ -537,7 +538,7 @@ private fun ZoomablePhotoWithOverlay(
     cellSize: Int,
     highlightedRegionIds: Set<Long>,
     selectedRegionId: Long?,
-    imageSize: IntSize,
+    @Suppress("UNUSED_PARAMETER") imageSize: IntSize,
     onImageSizeChanged: (IntSize) -> Unit,
     onRegionDoubleTap: (Region) -> Unit,
     onCellSingleTap: (Cell) -> Unit,
@@ -564,13 +565,13 @@ private fun ZoomablePhotoWithOverlay(
             if (containerAspect > imageAspect) {
                 // Container is wider - image is constrained by height
                 val displayWidth = photoHeight.toFloat() * imageAspect
-                val offsetX = (photoWidth.toFloat() - displayWidth) / 2f
-                android.graphics.RectF(offsetX, 0f, offsetX + displayWidth, photoHeight.toFloat())
+                val displayOffsetX = (photoWidth.toFloat() - displayWidth) / 2f
+                android.graphics.RectF(displayOffsetX, 0f, displayOffsetX + displayWidth, photoHeight.toFloat())
             } else {
                 // Container is taller - image is constrained by width
                 val displayHeight = photoWidth.toFloat() / imageAspect
-                val offsetY = (photoHeight.toFloat() - displayHeight) / 2f
-                android.graphics.RectF(0f, offsetY, photoWidth.toFloat(), offsetY + displayHeight)
+                val displayOffsetY = (photoHeight.toFloat() - displayHeight) / 2f
+                android.graphics.RectF(0f, displayOffsetY, photoWidth.toFloat(), displayOffsetY + displayHeight)
             }
         } else {
             android.graphics.RectF(0f, 0f, photoWidth.toFloat(), photoHeight.toFloat())
@@ -621,10 +622,9 @@ private fun ZoomablePhotoWithOverlay(
             contentScale = ContentScale.Fit,
             onSuccess = { state ->
                 // Get original image dimensions
-                state.result.drawable?.let { drawable ->
-                    originalImageWidth = drawable.intrinsicWidth
-                    originalImageHeight = drawable.intrinsicHeight
-                }
+                val drawable = state.result.drawable
+                originalImageWidth = drawable.intrinsicWidth
+                originalImageHeight = drawable.intrinsicHeight
             }
         )
         
@@ -982,7 +982,7 @@ private fun ProjectBottomBar(
     hasSelectedCells: Boolean,
     selectedRegion: Region?,
     showRegionCard: Boolean,
-    isEditingRegion: Boolean,
+    @Suppress("UNUSED_PARAMETER") isEditingRegion: Boolean,
     hasRegionChanges: Boolean,
     onHomeClick: () -> Unit,
     onEditRegionClick: () -> Unit,

@@ -172,7 +172,7 @@ fun MainScreen(
     ) { uri: Uri? ->
         uri?.let {
             val tempFile = File(context.cacheDir, "share_temp.zip")
-            uiState.selectedProject?.let { project ->
+            uiState.selectedProject?.let { _ ->
                 viewModel.exportProjectToZip(context, tempFile) { success, error ->
                     if (success) {
                         context.contentResolver.openOutputStream(uri)?.use { output ->
