@@ -742,11 +742,11 @@ class ExportManager @Inject constructor(
         builder.append(".viewer-content video{max-width:100%;max-height:100%;border-radius:4px;}")
         builder.append(".viewer-footer{display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 16px;background:#2a2a2a;flex-shrink:0;}")
         builder.append(".viewer-counter{color:#aaa;font-size:13px;}")
-        // Zoom controls - prominent blue buttons
-        builder.append(".zoom-controls{display:flex;align-items:center;gap:8px;}")
-        builder.append(".zoom-btn{background:#1976d2;border:2px solid #fff;color:#fff;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:20px;font-weight:bold;transition:background 0.2s;min-width:50px;text-align:center;}")
-        builder.append(".zoom-btn:hover{background:#1565c0;}")
-        builder.append(".zoom-level{color:#fff;font-size:14px;min-width:50px;text-align:center;font-family:monospace;font-weight:bold;}")
+        // Zoom controls - same style as viewer-btn
+        builder.append(".zoom-controls{display:flex;align-items:center;gap:4px;}")
+        builder.append(".zoom-btn{background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:16px;font-weight:bold;transition:background 0.2s;}")
+        builder.append(".zoom-btn:hover{background:rgba(255,255,255,0.2);}")
+        builder.append(".zoom-level{color:#fff;font-size:13px;min-width:50px;text-align:center;}")
         // Empty state
         builder.append(".empty-state{text-align:center;padding:40px 20px;color:#999;}")
         builder.append(".empty-state-icon{font-size:48px;margin-bottom:16px;opacity:0.5;}")
@@ -1090,7 +1090,7 @@ class ExportManager @Inject constructor(
         builder.append("function updateZoom(){")
         builder.append("const img=document.querySelector('#viewerContent img');")
         builder.append("if(img){")
-        builder.append("img.style.transform='scale('+currentZoom+')';")
+        builder.append("img.style.transform='translate('+translateX+'px,'+translateY+'px) scale('+currentZoom+')';")
         builder.append("img.classList.toggle('zoomed',currentZoom!==1);")
         builder.append("document.getElementById('zoomLevel').textContent=Math.round(currentZoom*100)+'%';")
         builder.append("}")
@@ -1101,18 +1101,41 @@ class ExportManager @Inject constructor(
         builder.append("function zoomOut(){")
         builder.append("if(currentZoom>minZoom){currentZoom=Math.max(minZoom,currentZoom-zoomStep);updateZoom();}")
         builder.append("}")
-        builder.append("function resetZoom(){currentZoom=1;updateZoom();}")
-        // Download current media
+        builder.append("function resetZoom(){currentZoom=1;translateX=0;translateY=0;updateZoom();}")
+        // Download current media - open in new tab
         builder.append("function downloadCurrentMedia(){")
         builder.append("if(currentMediaList.length===0)return;")
         builder.append("const item=currentMediaList[currentMediaIndex];")
-        builder.append("const link=document.createElement('a');")
-        builder.append("link.href=item.path;")
-        builder.append("link.download=item.path.split('/').pop();")
-        builder.append("document.body.appendChild(link);")
-        builder.append("link.click();")
-        builder.append("document.body.removeChild(link);")
+        builder.append("window.open(item.path,'_blank');")
         builder.append("}")
+        // Drag functionality for zoomed images
+        builder.append("let isDragging=false;")
+        builder.append("let startX=0,startY=0;")
+        builder.append("let translateX=0,translateY=0;")
+        builder.append("document.addEventListener('mousedown',function(e){")
+        builder.append("const img=document.querySelector('#viewerContent img');")
+        builder.append("if(!img||currentZoom===1)return;")
+        builder.append("if(e.target===img){")
+        builder.append("isDragging=true;")
+        builder.append("startX=e.clientX-translateX;")
+        builder.append("startY=e.clientY-translateY;")
+        builder.append("img.style.cursor='grabbing';")
+        builder.append("e.preventDefault();")
+        builder.append("}")
+        builder.append("});")
+        builder.append("document.addEventListener('mousemove',function(e){")
+        builder.append("if(!isDragging)return;")
+        builder.append("translateX=e.clientX-startX;")
+        builder.append("translateY=e.clientY-startY;")
+        builder.append("updateZoom();")
+        builder.append("});")
+        builder.append("document.addEventListener('mouseup',function(){")
+        builder.append("if(isDragging){")
+        builder.append("isDragging=false;")
+        builder.append("const img=document.querySelector('#viewerContent img');")
+        builder.append("if(img)img.style.cursor='grab';")
+        builder.append("}")
+        builder.append("});")
         // Keyboard navigation
         builder.append("document.addEventListener('keydown',function(e){")
         builder.append("if(!document.getElementById('mediaViewer').classList.contains('active'))return;")
@@ -1393,10 +1416,21 @@ class ExportManager @Inject constructor(
                     val contentPath = if (contentType != ContentType.TEXT) {
                         val mediaFile = mediaFiles[contentData.data]
                         if (mediaFile != null && mediaFile.exists()) {
+                            // Use original file extension from originalFileName if available
                             val extension = when (contentType) {
-                                ContentType.PHOTO -> ".jpg"
-                                ContentType.VIDEO -> ".mp4"
-                                ContentType.FILE -> "." + (mediaFile.extension.ifEmpty { "bin" })
+                                ContentType.PHOTO -> {
+                                    val ext = contentData.originalFileName?.substringAfterLast(".", "jpg") ?: "jpg"
+                                    ".$ext"
+                                }
+                                ContentType.VIDEO -> {
+                                    val ext = contentData.originalFileName?.substringAfterLast(".", "mp4") ?: "mp4"
+                                    ".$ext"
+                                }
+                                ContentType.FILE -> {
+                                    val ext = contentData.originalFileName?.substringAfterLast(".")
+                                        ?: mediaFile.extension.ifEmpty { "bin" }
+                                    ".$ext"
+                                }
                                 else -> ".bin"
                             }
                             val permanentMedia = File(mediaDir, "${contentType.name.lowercase()}_${regionId}_${System.currentTimeMillis()}$extension")
@@ -1413,7 +1447,9 @@ class ExportManager @Inject constructor(
                             regionId = regionId,
                             type = contentType,
                             data = contentPath,
-                            originalFileName = contentData.originalFileName,
+                            // Use originalFileName from JSON, or extract from path as fallback
+                            originalFileName = contentData.originalFileName?.ifBlank { null }
+                                ?: contentData.data.substringAfterLast("/"),
                             sortOrder = contentData.sortOrder
                         )
                     )
@@ -2004,11 +2040,11 @@ class ExportManager @Inject constructor(
         builder.append(".viewer-content video{max-width:100%;max-height:100%;border-radius:4px;}")
         builder.append(".viewer-footer{display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 16px;background:#2a2a2a;flex-shrink:0;}")
         builder.append(".viewer-counter{color:#aaa;font-size:13px;}")
-        // Zoom controls - prominent blue buttons
-        builder.append(".zoom-controls{display:flex;align-items:center;gap:8px;}")
-        builder.append(".zoom-btn{background:#1976d2;border:2px solid #fff;color:#fff;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:20px;font-weight:bold;transition:background 0.2s;min-width:50px;text-align:center;}")
-        builder.append(".zoom-btn:hover{background:#1565c0;}")
-        builder.append(".zoom-level{color:#fff;font-size:14px;min-width:50px;text-align:center;font-family:monospace;font-weight:bold;}")
+        // Zoom controls - same style as viewer-btn
+        builder.append(".zoom-controls{display:flex;align-items:center;gap:4px;}")
+        builder.append(".zoom-btn{background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:16px;font-weight:bold;transition:background 0.2s;}")
+        builder.append(".zoom-btn:hover{background:rgba(255,255,255,0.2);}")
+        builder.append(".zoom-level{color:#fff;font-size:13px;min-width:50px;text-align:center;}")
         // Empty state
         builder.append(".empty-state{text-align:center;padding:40px 20px;color:#999;}")
         builder.append(".empty-state-icon{font-size:48px;margin-bottom:16px;opacity:0.5;}")
@@ -2396,7 +2432,7 @@ class ExportManager @Inject constructor(
         builder.append("function updateZoom(){")
         builder.append("const img=document.getElementById('viewerImg');")
         builder.append("if(img){")
-        builder.append("img.style.transform='scale('+currentZoom+')';")
+        builder.append("img.style.transform='translate('+translateX+'px,'+translateY+'px) scale('+currentZoom+')';")
         builder.append("img.classList.toggle('zoomed',currentZoom!==1);")
         builder.append("}")
         builder.append("document.getElementById('zoomLevel').textContent=Math.round(currentZoom*100)+'%';")
@@ -2407,18 +2443,41 @@ class ExportManager @Inject constructor(
         builder.append("function zoomOut(){")
         builder.append("if(currentZoom>minZoom){currentZoom=Math.max(minZoom,currentZoom-zoomStep);updateZoom();}")
         builder.append("}")
-        builder.append("function resetZoom(){currentZoom=1;updateZoom();}")
-        // Download function
+        builder.append("function resetZoom(){currentZoom=1;translateX=0;translateY=0;updateZoom();}")
+        // Download function - open in new tab
         builder.append("function downloadCurrentMedia(){")
         builder.append("if(currentMediaList.length===0)return;")
         builder.append("const item=currentMediaList[currentMediaIndex];")
-        builder.append("const link=document.createElement('a');")
-        builder.append("link.href=item.path;")
-        builder.append("link.download=item.path.split('/').pop();")
-        builder.append("document.body.appendChild(link);")
-        builder.append("link.click();")
-        builder.append("document.body.removeChild(link);")
+        builder.append("window.open(item.path,'_blank');")
         builder.append("}")
+        // Drag functionality for zoomed images
+        builder.append("let isDragging=false;")
+        builder.append("let startX=0,startY=0;")
+        builder.append("let translateX=0,translateY=0;")
+        builder.append("document.addEventListener('mousedown',function(e){")
+        builder.append("const img=document.getElementById('viewerImg');")
+        builder.append("if(!img||currentZoom===1)return;")
+        builder.append("if(e.target===img){")
+        builder.append("isDragging=true;")
+        builder.append("startX=e.clientX-translateX;")
+        builder.append("startY=e.clientY-translateY;")
+        builder.append("img.style.cursor='grabbing';")
+        builder.append("e.preventDefault();")
+        builder.append("}")
+        builder.append("});")
+        builder.append("document.addEventListener('mousemove',function(e){")
+        builder.append("if(!isDragging)return;")
+        builder.append("translateX=e.clientX-startX;")
+        builder.append("translateY=e.clientY-startY;")
+        builder.append("updateZoom();")
+        builder.append("});")
+        builder.append("document.addEventListener('mouseup',function(){")
+        builder.append("if(isDragging){")
+        builder.append("isDragging=false;")
+        builder.append("const img=document.getElementById('viewerImg');")
+        builder.append("if(img)img.style.cursor='grab';")
+        builder.append("}")
+        builder.append("});")
         builder.append("document.addEventListener('keydown',function(e){")
         builder.append("if(!document.getElementById('mediaViewer').classList.contains('active'))return;")
         builder.append("if(e.key==='ArrowLeft')navigateMedia(-1);")
