@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -796,7 +797,7 @@ private fun MediaThumbnail(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.Default.InsertDriveFile,
+                            Icons.AutoMirrored.Filled.InsertDriveFile,
                             contentDescription = "File",
                             modifier = Modifier.size(40.dp),
                             tint = MaterialTheme.colorScheme.primary
@@ -1470,7 +1471,7 @@ private fun FileThumbnail(
                 verticalArrangement = Arrangement.Center
             ) {
                 Icon(
-                    Icons.Default.InsertDriveFile,
+                    Icons.AutoMirrored.Filled.InsertDriveFile,
                     contentDescription = "File",
                     modifier = Modifier.size(32.dp),
                     tint = MaterialTheme.colorScheme.primary

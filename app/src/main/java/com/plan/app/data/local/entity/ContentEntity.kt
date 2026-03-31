@@ -7,9 +7,9 @@ import androidx.room.PrimaryKey
 
 /**
  * Entity representing content attached to a region.
- * Types: "text", "photo", "video"
+ * Types: "text", "photo", "video", "file"
  * For text, data contains the text content.
- * For photo/video, data contains the relative path to the file.
+ * For photo/video/file, data contains the relative path to the file.
  */
 @Entity(
     tableName = "contents",
@@ -34,5 +34,5 @@ data class ContentEntity(
 )
 
 enum class ContentType {
-    TEXT, PHOTO, VIDEO
+    TEXT, PHOTO, VIDEO, FILE
 }

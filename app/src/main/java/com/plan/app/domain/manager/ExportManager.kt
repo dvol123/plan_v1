@@ -127,6 +127,7 @@ class ExportManager @Inject constructor(
                                 ContentType.PHOTO -> "media/photo_${region.id}_$index.jpg"
                                 ContentType.VIDEO -> "media/video_${region.id}_$index.mp4"
                                 ContentType.TEXT -> content.data
+                                ContentType.FILE -> "media/file_${region.id}_$index"
                             }
                             
                             contentExportList.add(
@@ -207,6 +208,7 @@ class ExportManager @Inject constructor(
                     
                     var photoIndex = 0
                     var videoIndex = 0
+                    var fileIndex = 0
                     
                     for (content in contents) {
                         when (content.type) {
@@ -229,6 +231,16 @@ class ExportManager @Inject constructor(
                                     sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
                                     contentInfos.add(ContentExportInfo("video", "$safeName/$fileName"))
                                     videoIndex++
+                                }
+                            }
+                            ContentType.FILE -> {
+                                val sourceFile = getFileFromUri(content.data)
+                                if (sourceFile != null && sourceFile.exists()) {
+                                    val extension = sourceFile.extension.ifEmpty { "bin" }
+                                    val fileName = "file_${fileIndex}.${extension}"
+                                    sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
+                                    contentInfos.add(ContentExportInfo("file", "${safeName}/${fileName}"))
+                                    fileIndex++
                                 }
                             }
                         }
@@ -1286,13 +1298,19 @@ class ExportManager @Inject constructor(
                     val contentType = when (contentData.type) {
                         "PHOTO" -> ContentType.PHOTO
                         "VIDEO" -> ContentType.VIDEO
+                        "FILE" -> ContentType.FILE
                         else -> ContentType.TEXT
                     }
                     
                     val contentPath = if (contentType != ContentType.TEXT) {
                         val mediaFile = mediaFiles[contentData.data]
                         if (mediaFile != null && mediaFile.exists()) {
-                            val extension = if (contentType == ContentType.PHOTO) ".jpg" else ".mp4"
+                            val extension = when (contentType) {
+                                ContentType.PHOTO -> ".jpg"
+                                ContentType.VIDEO -> ".mp4"
+                                ContentType.FILE -> "." + (mediaFile.extension.ifEmpty { "bin" })
+                                else -> ".bin"
+                            }
                             val permanentMedia = File(mediaDir, "${contentType.name.lowercase()}_${regionId}_${System.currentTimeMillis()}$extension")
                             mediaFile.copyTo(permanentMedia, overwrite = true)
                             mediaFile.delete()
@@ -1387,6 +1405,7 @@ class ExportManager @Inject constructor(
                     
                     var photoIndex = 0
                     var videoIndex = 0
+                    var fileIndex = 0
                     
                     for (content in contents) {
                         when (content.type) {
@@ -1409,6 +1428,16 @@ class ExportManager @Inject constructor(
                                     sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
                                     contentInfos.add(ContentExportInfo("video", "$safeName/$fileName"))
                                     videoIndex++
+                                }
+                            }
+                            ContentType.FILE -> {
+                                val sourceFile = getFileFromUri(content.data)
+                                if (sourceFile != null && sourceFile.exists()) {
+                                    val extension = sourceFile.extension.ifEmpty { "bin" }
+                                    val fileName = "file_${fileIndex}.${extension}"
+                                    sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
+                                    contentInfos.add(ContentExportInfo("file", "${safeName}/${fileName}"))
+                                    fileIndex++
                                 }
                             }
                         }
@@ -1492,6 +1521,7 @@ class ExportManager @Inject constructor(
                         
                         var photoIndex = 0
                         var videoIndex = 0
+                    var fileIndex = 0
                         
                         for (content in contents) {
                             when (content.type) {
@@ -1514,6 +1544,16 @@ class ExportManager @Inject constructor(
                                         sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
                                         contentInfos.add(ContentExportInfo("video", "$regionFolder/$fileName"))
                                         videoIndex++
+                                    }
+                                }
+                                ContentType.FILE -> {
+                                    val sourceFile = getFileFromUri(content.data)
+                                    if (sourceFile != null && sourceFile.exists()) {
+                                        val extension = sourceFile.extension.ifEmpty { "bin" }
+                                        val fileName = "file_${fileIndex}.${extension}"
+                                        sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
+                                        contentInfos.add(ContentExportInfo("file", "${regionFolder}/${fileName}"))
+                                        fileIndex++
                                     }
                                 }
                             }

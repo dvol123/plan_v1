@@ -56,6 +56,7 @@ class ContentRepositoryImpl @Inject constructor(
                 com.plan.app.data.local.entity.ContentType.TEXT -> ContentType.TEXT
                 com.plan.app.data.local.entity.ContentType.PHOTO -> ContentType.PHOTO
                 com.plan.app.data.local.entity.ContentType.VIDEO -> ContentType.VIDEO
+                com.plan.app.data.local.entity.ContentType.FILE -> ContentType.FILE
             },
             data = data,
             sortOrder = sortOrder,
@@ -71,6 +72,7 @@ class ContentRepositoryImpl @Inject constructor(
                 ContentType.TEXT -> com.plan.app.data.local.entity.ContentType.TEXT
                 ContentType.PHOTO -> com.plan.app.data.local.entity.ContentType.PHOTO
                 ContentType.VIDEO -> com.plan.app.data.local.entity.ContentType.VIDEO
+                ContentType.FILE -> com.plan.app.data.local.entity.ContentType.FILE
             },
             data = data,
             sortOrder = sortOrder,
