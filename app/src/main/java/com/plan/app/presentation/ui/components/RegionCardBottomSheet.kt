@@ -291,7 +291,6 @@ fun RegionCardBottomSheet(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 @Suppress("UNUSED_PARAMETER")
-@Composable
 fun MediaThumbnail(
     content: Content,
     onClick: () -> Unit,
