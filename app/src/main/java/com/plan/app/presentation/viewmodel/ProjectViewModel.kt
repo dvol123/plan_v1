@@ -449,6 +449,38 @@ class ProjectViewModel @Inject constructor(
         }
     }
     
+    fun addFileToRegion(context: Context, regionId: Long, uri: Uri) {
+        viewModelScope.launch {
+            try {
+                android.util.Log.d("ProjectViewModel", "Adding file to region $regionId, uri: $uri")
+                
+                // Copy file to app's permanent storage
+                val savedPath = copyMediaToPermanentStorage(context, uri, regionId, "file")
+                android.util.Log.d("ProjectViewModel", "File saved to: $savedPath")
+                
+                // Get next sort order
+                val sortOrder = manageContentUseCase.getByRegionOnce(regionId).size
+                
+                // Create content record
+                val content = Content(
+                    regionId = regionId,
+                    type = ContentType.FILE,
+                    data = savedPath,
+                    sortOrder = sortOrder
+                )
+                val contentId = manageContentUseCase.add(content)
+                android.util.Log.d("ProjectViewModel", "Content inserted with id: $contentId")
+                
+                // Refresh the selected region
+                refreshSelectedRegion()
+                android.util.Log.d("ProjectViewModel", "Region refreshed, contents count: ${_uiState.value.selectedRegion?.contents?.size}")
+            } catch (e: Exception) {
+                android.util.Log.e("ProjectViewModel", "Failed to save file", e)
+                _uiState.value = _uiState.value.copy(errorMessage = "Failed to save file: ${e.message}")
+            }
+        }
+    }
+    
     private suspend fun refreshSelectedRegion() {
         _uiState.value.selectedRegion?.let { currentRegion ->
             android.util.Log.d("ProjectViewModel", "Refreshing region ${currentRegion.id}")
@@ -472,7 +504,15 @@ class ProjectViewModel @Inject constructor(
             
             // Create unique filename
             val timestamp = System.currentTimeMillis()
-            val extension = if (type == "photo") "jpg" else "mp4"
+            val extension = when (type) {
+                "photo" -> "jpg"
+                "video" -> "mp4"
+                "file" -> {
+                    // Try to get extension from URI
+                    sourceUri.lastPathSegment?.substringAfterLast(".", "bin") ?: "bin"
+                }
+                else -> "bin"
+            }
             val fileName = "${type}_${regionId}_$timestamp.$extension"
             val destFile = File(mediaDir, fileName)
             
@@ -480,7 +520,7 @@ class ProjectViewModel @Inject constructor(
                 // For photos: handle EXIF orientation
                 copyPhotoWithCorrectOrientation(context, sourceUri, destFile)
             } else {
-                // For videos: just copy the file (orientation is handled by video player)
+                // For videos and files: just copy the file
                 context.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
                     FileOutputStream(destFile).use { outputStream ->
                         inputStream.copyTo(outputStream)

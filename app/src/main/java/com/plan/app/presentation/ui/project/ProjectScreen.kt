@@ -458,6 +458,11 @@ fun ProjectScreen(
                     viewModel.addVideoToRegion(context, region.id, uri)
                 }
             },
+            onAddFile = { uri ->
+                uiState.selectedRegion?.let { region ->
+                    viewModel.addFileToRegion(context, region.id, uri)
+                }
+            },
             onDeleteMedia = { content ->
                 viewModel.deleteContent(content)
             },

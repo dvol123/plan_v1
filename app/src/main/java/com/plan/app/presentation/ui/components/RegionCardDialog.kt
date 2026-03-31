@@ -75,6 +75,7 @@ fun RegionCardDialog(
     onSave: (Region) -> Unit,
     onAddPhoto: (Uri) -> Unit,
     onAddVideo: (Uri) -> Unit,
+    onAddFile: (Uri) -> Unit = {},
     onDeleteMedia: (Content) -> Unit = {},
     onCreateState: (String, Int) -> Unit = { _, _ -> }
 ) {
@@ -115,6 +116,11 @@ fun RegionCardDialog(
         region.contents.filter { it.type == ContentType.PHOTO || it.type == ContentType.VIDEO }
     }
     
+    // File contents (documents, etc.)
+    val fileContents = remember(region.contents) {
+        region.contents.filter { it.type == ContentType.FILE }
+    }
+    
     // Gallery picker for photos
     val photoGalleryPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -138,6 +144,19 @@ fun RegionCardDialog(
                 Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
             onAddVideo(it)
+        }
+    }
+    
+    // File picker for documents
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            onAddFile(it)
         }
     }
     
@@ -392,8 +411,68 @@ fun RegionCardDialog(
                         },
                         onAddVideoFromGallery = {
                             videoGalleryPicker.launch(arrayOf("video/*"))
+                        },
+                        onAddFile = {
+                            filePicker.launch(arrayOf("*/*"))
                         }
                     )
+                    
+                    // Files section
+                    if (fileContents.isNotEmpty() || isEditing) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Text(
+                            text = stringResource(R.string.file),
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Existing files
+                            items(fileContents.indices.toList()) { index ->
+                                val content = fileContents[index]
+                                val isDeleted = content.id in deletedContentIds
+                                FileThumbnail(
+                                    content = content,
+                                    isDeleted = isDeleted,
+                                    onClick = {
+                                        if (!isDeleted) {
+                                            // Open file with external app
+                                            try {
+                                                val file = java.io.File(content.data)
+                                                val uri = FileProvider.getUriForFile(
+                                                    context,
+                                                    "${context.packageName}.fileprovider",
+                                                    file
+                                                )
+                                                val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+                                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                    setDataAndType(uri, mimeType)
+                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                }
+                                                context.startActivity(Intent.createChooser(intent, context.getString(R.string.open_with)))
+                                            } catch (e: Exception) {
+                                                // Handle error
+                                            }
+                                        }
+                                    },
+                                    onLongClick = {
+                                        if (!isDeleted && isEditing) {
+                                            mediaToDelete = content
+                                            showDeleteMediaDialog = true
+                                        }
+                                    },
+                                    onUndoDelete = {
+                                        deletedContentIds = deletedContentIds - content.id
+                                    },
+                                    isEditing = isEditing
+                                )
+                            }
+                        }
+                    }
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
@@ -548,7 +627,8 @@ private fun MediaGallerySection(
     onAddPhotoFromCamera: () -> Unit,
     onAddPhotoFromGallery: () -> Unit,
     onAddVideoFromCamera: () -> Unit,
-    onAddVideoFromGallery: () -> Unit
+    onAddVideoFromGallery: () -> Unit,
+    onAddFile: () -> Unit = {}
 ) {
     Column {
         Text(
@@ -603,6 +683,14 @@ private fun MediaGallerySection(
                         galleryText = stringResource(R.string.add_from_gallery),
                         onCameraClick = onAddVideoFromCamera,
                         onGalleryClick = onAddVideoFromGallery
+                    )
+                }
+                
+                item {
+                    AddMediaButton(
+                        text = stringResource(R.string.add_file),
+                        icon = Icons.Default.AttachFile,
+                        onClick = onAddFile
                     )
                 }
             }
@@ -1316,6 +1404,96 @@ private fun VideoPlayer(
         },
         modifier = Modifier.fillMaxSize()
     )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FileThumbnail(
+    content: Content,
+    isDeleted: Boolean = false,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
+    onUndoDelete: () -> Unit = {},
+    isEditing: Boolean = false
+) {
+    // Get file name from URI
+    val fileName = remember(content.data) {
+        try {
+            val uri = Uri.parse(content.data)
+            uri.lastPathSegment ?: "File"
+        } catch (e: Exception) {
+            "File"
+        }
+    }
+    
+    Card(
+        modifier = Modifier
+            .size(80.dp)
+            .then(
+                when {
+                    isDeleted -> Modifier.clickable { onUndoDelete() }
+                    isEditing -> Modifier.combinedClickable(
+                        onClick = onClick,
+                        onLongClick = onLongClick
+                    )
+                    else -> Modifier.clickable(onClick = onClick)
+                }
+            ),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // File icon
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    Icons.Default.InsertDriveFile,
+                    contentDescription = "File",
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = fileName.take(10),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+            
+            // Deleted overlay
+            if (isDeleted) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.error.copy(alpha = 0.7f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Deleted",
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.tap_to_restore),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**

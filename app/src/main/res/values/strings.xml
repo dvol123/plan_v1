@@ -85,6 +85,9 @@
     <string name="media">Media</string>
     <string name="add_photo">Add Photo</string>
     <string name="add_video">Add Video</string>
+    <string name="add_file">Add File</string>
+    <string name="open_with">Open with…</string>
+    <string name="file">File</string>
     <string name="no_media">No media attached</string>
     <string name="no_state">No state selected</string>
     

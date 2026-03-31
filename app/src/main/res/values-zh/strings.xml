@@ -85,6 +85,9 @@
     <string name="media">媒体</string>
     <string name="add_photo">添加照片</string>
     <string name="add_video">添加视频</string>
+    <string name="add_file">添加文件</string>
+    <string name="open_with">打开方式…</string>
+    <string name="file">文件</string>
     <string name="no_media">未附加媒体</string>
     <string name="no_state">未选择状态</string>
     

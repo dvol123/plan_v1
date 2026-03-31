@@ -85,6 +85,9 @@
     <string name="media">Медиа</string>
     <string name="add_photo">Добавить фото</string>
     <string name="add_video">Добавить видео</string>
+    <string name="add_file">Добавить файл</string>
+    <string name="open_with">Открыть с помощью…</string>
+    <string name="file">Файл</string>
     <string name="no_media">Нет прикреплённых медиа</string>
     <string name="no_state">Состояние не выбрано</string>
     

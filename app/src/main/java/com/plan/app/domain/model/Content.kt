@@ -17,5 +17,5 @@ data class Content(
 ) : Parcelable
 
 enum class ContentType {
-    TEXT, PHOTO, VIDEO
+    TEXT, PHOTO, VIDEO, FILE
 }
