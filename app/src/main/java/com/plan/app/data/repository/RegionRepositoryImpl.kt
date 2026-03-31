@@ -118,6 +118,7 @@ class RegionRepositoryImpl @Inject constructor(
                 com.plan.app.data.local.entity.ContentType.TEXT -> ContentType.TEXT
                 com.plan.app.data.local.entity.ContentType.PHOTO -> ContentType.PHOTO
                 com.plan.app.data.local.entity.ContentType.VIDEO -> ContentType.VIDEO
+                com.plan.app.data.local.entity.ContentType.FILE -> ContentType.FILE
             },
             data = data,
             sortOrder = sortOrder,

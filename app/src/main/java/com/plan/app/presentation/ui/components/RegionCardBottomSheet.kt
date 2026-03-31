@@ -287,7 +287,9 @@ fun RegionCardBottomSheet(
 }
 
 @Composable
-private fun MediaThumbnail(
+@Suppress("UNUSED_PARAMETER")
+@Composable
+fun MediaThumbnail(
     content: Content,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
