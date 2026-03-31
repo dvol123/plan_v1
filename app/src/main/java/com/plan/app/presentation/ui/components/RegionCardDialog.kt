@@ -1451,9 +1451,8 @@ private fun FileThumbnail(
         // First try to use originalFileName if available
         content.originalFileName?.ifBlank { null }
             // Otherwise extract file name from the file path
-            ?: content.data.substringAfterLast("/")
-            ?: content.data.substringAfterLast("\\")
-            ?: "File"
+            ?: content.data.substringAfterLast("/").substringAfterLast("\\")
+            .ifEmpty { "File" }
     }
     
     // Determine file type info based on extension
@@ -1486,7 +1485,7 @@ private fun FileThumbnail(
             )
             "txt" -> FileInfo(
                 extension = ext,
-                icon = Icons.Default.Article,
+                icon = Icons.AutoMirrored.Filled.Article,
                 color = Color(0xFF757575), // Gray for text
                 label = "TXT"
             )

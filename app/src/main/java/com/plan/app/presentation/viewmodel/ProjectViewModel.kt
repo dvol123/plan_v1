@@ -561,6 +561,7 @@ class ProjectViewModel @Inject constructor(
     /**
      * Get the original file name from a content URI.
      */
+    @Suppress("UNUSED_PARAMETER")
     private fun getOriginalFileName(context: Context, uri: Uri, type: String): String {
         return try {
             // Try to get display name from ContentResolver
