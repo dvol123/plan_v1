@@ -130,17 +130,6 @@
     <string name="invalid_import_file">导入文件无效</string>
     <string name="import_wrong_format">此文件是HTML报告，不是项目备份。请使用分享（而非导出）功能创建可导入的备份。</string>
     
-    <!-- Fullscreen Media Viewer -->
-    <string name="photo">照片</string>
-    <string name="video">视频</string>
-    <string name="zoom_in">放大</string>
-    <string name="zoom_out">缩小</string>
-    <string name="reset_zoom">重置缩放</string>
-    <string name="save_to_gallery">保存到相册</string>
-    <string name="saved_to_gallery">已保存到相册</string>
-    <string name="save_failed">保存失败</string>
-    <string name="back_to_gallery">返回相册</string>
-    
     <!-- Common -->
     <string name="create">创建</string>
     <string name="unsaved_changes">有未保存的更改。离开前保存吗？</string>

@@ -1174,7 +1174,6 @@ private fun FullscreenMediaViewer(
     onDismiss: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val context = LocalContext.current
     
     // Pager state for swipe between photos
     val pagerState = rememberPagerState(
@@ -1184,34 +1183,6 @@ private fun FullscreenMediaViewer(
     
     // Current content based on pager
     val currentIndex = pagerState.currentPage
-    val currentContent = mediaContents.getOrNull(currentIndex)
-    
-    // Get file name for display
-    val fileName = remember(currentContent) {
-        currentContent?.let { content ->
-            content.originalFileName 
-                ?: try {
-                    val file = java.io.File(content.data)
-                    file.nameWithoutExtension
-                } catch (e: Exception) {
-                    when (content.type) {
-                        ContentType.PHOTO -> context.getString(R.string.photo)
-                        ContentType.VIDEO -> context.getString(R.string.video)
-                        else -> context.getString(R.string.file)
-                    }
-                }
-        } ?: ""
-    }
-    
-    // Save to gallery functionality
-    var saveMessage by remember { mutableStateOf<String?>(null) }
-    
-    LaunchedEffect(saveMessage) {
-        if (saveMessage != null) {
-            kotlinx.coroutines.delay(2000)
-            saveMessage = null
-        }
-    }
     
     Dialog(
         onDismissRequest = onDismiss,
@@ -1226,82 +1197,21 @@ private fun FullscreenMediaViewer(
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
-            // Top header bar
-            Surface(
+            // Close button
+            IconButton(
+                onClick = onDismiss,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .zIndex(2f),
-                color = Color.Black.copy(alpha = 0.7f)
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .zIndex(2f)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // File name on the left
-                    Text(
-                        text = fileName,
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp)
-                    )
-                    
-                    // Save button
-                    if (currentContent?.type == ContentType.PHOTO) {
-                        IconButton(
-                            onClick = {
-                                currentContent?.let { content ->
-                                    val saved = saveMediaToGallery(context, content.data, "image")
-                                    saveMessage = if (saved) context.getString(R.string.saved_to_gallery) else context.getString(R.string.save_failed)
-                                }
-                            },
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Download,
-                                contentDescription = stringResource(R.string.save_to_gallery),
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                    
-                    // Navigation: Back to gallery button
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.GridView,
-                            contentDescription = stringResource(R.string.back_to_gallery),
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-            }
-            
-            // Save message toast
-            if (saveMessage != null) {
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 60.dp)
-                        .zIndex(3f),
-                    color = Color.Black.copy(alpha = 0.8f),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = saveMessage!!,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                }
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
             }
             
             // HorizontalPager for swipe between media
@@ -1337,7 +1247,7 @@ private fun FullscreenMediaViewer(
                 }
             }
             
-            // Navigation arrows for multiple media (left/right sides)
+            // Navigation arrows for multiple media
             if (mediaContents.size > 1) {
                 // Previous button
                 if (currentIndex > 0) {
@@ -1349,7 +1259,7 @@ private fun FullscreenMediaViewer(
                         },
                         modifier = Modifier
                             .align(Alignment.CenterStart)
-                            .padding(start = 8.dp)
+                            .padding(16.dp)
                             .zIndex(2f)
                             .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                     ) {
@@ -1372,7 +1282,7 @@ private fun FullscreenMediaViewer(
                         },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .padding(end = 8.dp)
+                            .padding(16.dp)
                             .zIndex(2f)
                             .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                     ) {
@@ -1385,7 +1295,7 @@ private fun FullscreenMediaViewer(
                     }
                 }
                 
-                // Page indicator at bottom
+                // Page indicator
                 Text(
                     text = "${currentIndex + 1} / ${mediaContents.size}",
                     color = Color.White,
@@ -1398,42 +1308,6 @@ private fun FullscreenMediaViewer(
                 )
             }
         }
-    }
-}
-
-/**
- * Save media to gallery
- */
-private fun saveMediaToGallery(context: android.content.Context, filePath: String, mimeType: String): Boolean {
-    return try {
-        val sourceFile = java.io.File(filePath)
-        if (!sourceFile.exists()) return false
-        
-        val contentValues = android.content.ContentValues().apply {
-            put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, sourceFile.name)
-            put(android.provider.MediaStore.MediaColumns.MIME_TYPE, if (mimeType == "image") "image/jpeg" else "video/mp4")
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, if (mimeType == "image") android.os.Environment.DIRECTORY_PICTURES else android.os.Environment.DIRECTORY_MOVIES)
-            }
-        }
-        
-        val resolver = context.contentResolver
-        val uri = if (mimeType == "image") {
-            android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        } else {
-            android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-        }
-        
-        val insertedUri = resolver.insert(uri, contentValues) ?: return false
-        resolver.openOutputStream(insertedUri)?.use { outputStream ->
-            sourceFile.inputStream().use { inputStream ->
-                inputStream.copyTo(outputStream)
-            }
-        }
-        true
-    } catch (e: Exception) {
-        android.util.Log.e("FullscreenMediaViewer", "Failed to save media", e)
-        false
     }
 }
 
