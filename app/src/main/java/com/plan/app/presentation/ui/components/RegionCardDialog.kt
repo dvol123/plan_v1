@@ -614,6 +614,7 @@ private fun MediaPlaceholder() {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MediaThumbnail(
     content: Content,
