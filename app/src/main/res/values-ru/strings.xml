@@ -130,6 +130,17 @@
     <string name="invalid_import_file">Неверный файл импорта</string>
     <string name="import_wrong_format">Этот файл является HTML-отчётом, а не резервной копией. Используйте Обмен (не Экспорт) для создания резервных копий.</string>
     
+    <!-- Fullscreen Media Viewer -->
+    <string name="photo">Фото</string>
+    <string name="video">Видео</string>
+    <string name="zoom_in">Увеличить</string>
+    <string name="zoom_out">Уменьшить</string>
+    <string name="reset_zoom">Сбросить масштаб</string>
+    <string name="save_to_gallery">Сохранить в галерею</string>
+    <string name="saved_to_gallery">Сохранено в галерею</string>
+    <string name="save_failed">Ошибка сохранения</string>
+    <string name="back_to_gallery">К галерее</string>
+    
     <!-- Common -->
     <string name="create">Создать</string>
     <string name="unsaved_changes">Есть несохранённые изменения. Сохранить перед выходом?</string>

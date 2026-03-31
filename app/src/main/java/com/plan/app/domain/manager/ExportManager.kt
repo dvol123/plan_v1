@@ -114,6 +114,8 @@ class ExportManager @Inject constructor(
                     }
                     
                     val mediaFiles = mutableMapOf<String, File>()
+                    // Track used paths to ensure uniqueness
+                    val usedPaths = mutableSetOf<String>()
                     
                     for (region in regions) {
                         val state = region.stateId?.let { stateId ->
@@ -125,7 +127,8 @@ class ExportManager @Inject constructor(
                         
                         contents.forEachIndexed { index, content ->
                             // Use original file name if available, otherwise generate one
-                            val relativePath = when (content.type) {
+                            // Ensure unique path by adding region_id suffix if needed
+                            val baseRelativePath = when (content.type) {
                                 ContentType.PHOTO -> {
                                     val ext = content.originalFileName?.substringAfterLast(".", "jpg") ?: "jpg"
                                     val baseName = content.originalFileName?.substringBeforeLast(".")
@@ -147,6 +150,20 @@ class ExportManager @Inject constructor(
                                         ?: "file_${region.id}_$index"
                                     "media/$baseName.$ext"
                                 }
+                            }
+                            
+                            // Make path unique if it's already used
+                            val relativePath = if (content.type != ContentType.TEXT) {
+                                if (usedPaths.contains(baseRelativePath)) {
+                                    // Add region_id to make it unique
+                                    val ext = baseRelativePath.substringAfterLast(".")
+                                    val pathWithoutExt = baseRelativePath.substringBeforeLast(".")
+                                    "${pathWithoutExt}_r${region.id}.$ext"
+                                } else {
+                                    baseRelativePath
+                                }.also { usedPaths.add(it) }
+                            } else {
+                                baseRelativePath
                             }
                             
                             contentExportList.add(

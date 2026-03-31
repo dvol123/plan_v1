@@ -130,6 +130,17 @@
     <string name="invalid_import_file">Invalid import file</string>
     <string name="import_wrong_format">This file is an HTML report, not a project backup. Use Share (not Export) to create importable backups.</string>
     
+    <!-- Fullscreen Media Viewer -->
+    <string name="photo">Photo</string>
+    <string name="video">Video</string>
+    <string name="zoom_in">Zoom In</string>
+    <string name="zoom_out">Zoom Out</string>
+    <string name="reset_zoom">Reset Zoom</string>
+    <string name="save_to_gallery">Save to Gallery</string>
+    <string name="saved_to_gallery">Saved to Gallery</string>
+    <string name="save_failed">Failed to save</string>
+    <string name="back_to_gallery">Back to Gallery</string>
+    
     <!-- Common -->
     <string name="create">Create</string>
     <string name="unsaved_changes">You have unsaved changes. Save before leaving?</string>
