@@ -788,6 +788,21 @@ private fun MediaThumbnail(
                         )
                     }
                 }
+                ContentType.FILE -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.InsertDriveFile,
+                            contentDescription = "File",
+                            modifier = Modifier.size(40.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
                 ContentType.TEXT -> {
                     // Text content is not shown in gallery
                 }
@@ -1217,6 +1232,10 @@ private fun FullscreenMediaViewer(
                             videoUri = pageContent.data,
                             isCurrentPage = page == currentIndex
                         )
+                    }
+                    ContentType.FILE -> {
+                        // Files are not shown in fullscreen viewer
+                        // They should be opened externally via "Open with..."
                     }
                     ContentType.TEXT -> {
                         // Not shown in fullscreen

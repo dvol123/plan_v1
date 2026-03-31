@@ -327,6 +327,20 @@ private fun MediaThumbnail(
                         )
                     }
                 }
+                ContentType.FILE -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.InsertDriveFile,
+                            contentDescription = "File",
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
                 ContentType.TEXT -> {
                     // Text content is not shown in gallery
                 }
