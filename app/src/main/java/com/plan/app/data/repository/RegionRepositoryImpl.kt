@@ -121,6 +121,7 @@ class RegionRepositoryImpl @Inject constructor(
                 com.plan.app.data.local.entity.ContentType.FILE -> ContentType.FILE
             },
             data = data,
+            originalFileName = originalFileName,
             sortOrder = sortOrder,
             createdAt = createdAt
         )

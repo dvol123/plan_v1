@@ -1426,6 +1426,16 @@ private fun VideoPlayer(
     )
 }
 
+/**
+ * File type info for display
+ */
+private data class FileInfo(
+    val extension: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val color: Color,
+    val label: String
+)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FileThumbnail(
@@ -1439,13 +1449,66 @@ private fun FileThumbnail(
     // Get file name from originalFileName or extract from file path
     val fileName = remember(content.originalFileName, content.data) {
         // First try to use originalFileName if available
-        val name = content.originalFileName?.ifBlank { null }
+        content.originalFileName?.ifBlank { null }
             // Otherwise extract file name from the file path
             ?: content.data.substringAfterLast("/")
             ?: content.data.substringAfterLast("\\")
             ?: "File"
-        android.util.Log.d("FileThumbnail", "Displaying file: originalFileName=${content.originalFileName}, data=${content.data}, displayName=$name")
-        name
+    }
+    
+    // Determine file type info based on extension
+    val fileInfo = remember(fileName) {
+        val ext = fileName.substringAfterLast(".", "").lowercase()
+        when (ext) {
+            "pdf" -> FileInfo(
+                extension = ext,
+                icon = Icons.Default.PictureAsPdf,
+                color = Color(0xFFE53935), // Red for PDF
+                label = "PDF"
+            )
+            "doc", "docx" -> FileInfo(
+                extension = ext,
+                icon = Icons.Default.Description,
+                color = Color(0xFF1E88E5), // Blue for Word
+                label = "DOC"
+            )
+            "xls", "xlsx" -> FileInfo(
+                extension = ext,
+                icon = Icons.Default.TableChart,
+                color = Color(0xFF43A047), // Green for Excel
+                label = "XLS"
+            )
+            "ppt", "pptx" -> FileInfo(
+                extension = ext,
+                icon = Icons.Default.Slideshow,
+                color = Color(0xFFFB8C00), // Orange for PowerPoint
+                label = "PPT"
+            )
+            "txt" -> FileInfo(
+                extension = ext,
+                icon = Icons.Default.Article,
+                color = Color(0xFF757575), // Gray for text
+                label = "TXT"
+            )
+            "zip", "rar", "7z", "tar", "gz" -> FileInfo(
+                extension = ext,
+                icon = Icons.Default.FolderZip,
+                color = Color(0xFF8D6E63), // Brown for archives
+                label = "ZIP"
+            )
+            "mp3", "wav", "ogg", "flac" -> FileInfo(
+                extension = ext,
+                icon = Icons.Default.AudioFile,
+                color = Color(0xFF9C27B0), // Purple for audio
+                label = "AUDIO"
+            )
+            else -> FileInfo(
+                extension = ext,
+                icon = Icons.AutoMirrored.Filled.InsertDriveFile,
+                color = MaterialTheme.colorScheme.primary,
+                label = ext.uppercase().take(3)
+            )
+        }
     }
     
     Card(
@@ -1466,21 +1529,31 @@ private fun FileThumbnail(
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
-            // File icon
+            // File icon with type-specific styling
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(fileInfo.color.copy(alpha = 0.1f)),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 Icon(
-                    Icons.AutoMirrored.Filled.InsertDriveFile,
-                    contentDescription = "File",
+                    fileInfo.icon,
+                    contentDescription = fileInfo.label,
                     modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = fileInfo.color
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = fileName.take(10),
+                    text = fileInfo.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = fileInfo.color,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = fileName.take(8),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1

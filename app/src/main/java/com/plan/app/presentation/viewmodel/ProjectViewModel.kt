@@ -563,26 +563,19 @@ class ProjectViewModel @Inject constructor(
      */
     private fun getOriginalFileName(context: Context, uri: Uri, type: String): String {
         return try {
-            android.util.Log.d("ProjectViewModel", "getOriginalFileName: uri=$uri, type=$type")
-            
             // Try to get display name from ContentResolver
             val cursor = context.contentResolver.query(uri, null, null, null, null)
             cursor?.use {
                 val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                android.util.Log.d("ProjectViewModel", "DISPLAY_NAME column index: $nameIndex")
                 if (nameIndex >= 0 && it.moveToFirst()) {
-                    val name = it.getString(nameIndex) ?: ""
-                    android.util.Log.d("ProjectViewModel", "Got original file name: $name")
-                    return name
+                    return it.getString(nameIndex) ?: ""
                 }
             }
             
             // Fallback: try to get from URI path
-            val fallback = uri.lastPathSegment?.substringAfterLast("/") ?: ""
-            android.util.Log.d("ProjectViewModel", "Using fallback file name: $fallback")
-            fallback
+            uri.lastPathSegment?.substringAfterLast("/") ?: ""
         } catch (e: Exception) {
-            android.util.Log.e("ProjectViewModel", "Failed to get original file name for uri=$uri", e)
+            android.util.Log.e("ProjectViewModel", "Failed to get original file name", e)
             ""
         }
     }
