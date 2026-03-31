@@ -59,7 +59,6 @@ import com.plan.app.domain.model.State
 import net.engawapg.lib.zoomable.rememberZoomState
 import net.engawapg.lib.zoomable.zoomable
 import net.engawapg.lib.zoomable.ScrollGesturePropagation
-import net.engawapg.lib.zoomable.ZoomState
 import java.io.File
 import kotlinx.coroutines.launch
 
@@ -1187,9 +1186,6 @@ private fun FullscreenMediaViewer(
     val currentIndex = pagerState.currentPage
     val currentContent = mediaContents.getOrNull(currentIndex)
     
-    // Zoom state for current photo
-    val zoomState = rememberZoomState()
-    
     // Get file name for display
     val fileName = remember(currentContent) {
         currentContent?.let { content ->
@@ -1275,39 +1271,6 @@ private fun FullscreenMediaViewer(
                         }
                     }
                     
-                    // Zoom buttons (only for photos)
-                    if (currentContent?.type == ContentType.PHOTO) {
-                        // Zoom out
-                        IconButton(
-                            onClick = {
-                                zoomState.zoom(zoomState.scale * 0.8f)
-                            },
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.ZoomOut,
-                                contentDescription = stringResource(R.string.zoom_out),
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        
-                        // Zoom in
-                        IconButton(
-                            onClick = {
-                                zoomState.zoom(zoomState.scale * 1.25f)
-                            },
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.ZoomIn,
-                                contentDescription = stringResource(R.string.zoom_in),
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                    
                     // Navigation: Back to gallery button
                     IconButton(
                         onClick = onDismiss,
@@ -1350,10 +1313,8 @@ private fun FullscreenMediaViewer(
                 
                 when (pageContent?.type) {
                     ContentType.PHOTO -> {
-                        // Use zoom state only for current page
-                        ZoomablePhotoWithState(
-                            contentData = pageContent.data,
-                            zoomState = if (page == currentIndex) zoomState else rememberZoomState()
+                        ZoomablePhoto(
+                            contentData = pageContent.data
                         )
                     }
                     ContentType.VIDEO -> {
@@ -1514,41 +1475,6 @@ private fun ZoomablePhoto(
             contentScale = ContentScale.Fit,
             onSuccess = { state ->
                 // Set content size for proper zoom behavior
-                zoomState.setContentSize(state.painter.intrinsicSize)
-            }
-        )
-    }
-}
-
-/**
- * Zoomable photo composable with external zoom state.
- * Used for programmatic zoom control from the header buttons.
- */
-@Composable
-private fun ZoomablePhotoWithState(
-    contentData: String,
-    zoomState: ZoomState
-) {
-    val context = LocalContext.current
-    
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(contentData)
-                .crossfade(true)
-                .build(),
-            contentDescription = "Photo",
-            modifier = Modifier
-                .fillMaxSize()
-                .zoomable(
-                    zoomState = zoomState,
-                    scrollGesturePropagation = ScrollGesturePropagation.ContentEdge
-                ),
-            contentScale = ContentScale.Fit,
-            onSuccess = { state ->
                 zoomState.setContentSize(state.painter.intrinsicSize)
             }
         )
