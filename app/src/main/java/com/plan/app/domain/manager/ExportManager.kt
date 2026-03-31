@@ -931,6 +931,17 @@ class ExportManager @Inject constructor(
         builder.append("+(r.type2?'<div class=\\'info-section\\'><div class=\\'info-label\\'>${t.type2}</div><div class=\\'info-value\\'>'+r.type2+'</div></div>':'')")
         builder.append("+(r.description?'<div class=\\'info-section\\'><div class=\\'info-label\\'>${t.description}</div><div class=\\'info-value\\'>'+r.description+'</div></div>':'')")
         builder.append("+(r.note?'<div class=\\'info-section\\'><div class=\\'info-label\\'>${t.note}</div><div class=\\'info-value\\'>'+r.note+'</div></div>':'');")
+        // Add files section in info panel
+        builder.append("const files=(r.contents||[]).filter(c=>c.type==='file');")
+        builder.append("if(files.length>0){")
+        builder.append("infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>${t.files}</div>';"")
+        builder.append("files.forEach(function(f){")
+        builder.append("const fName=f.path.split('/').pop();")
+        builder.append("infoHtml+='<div style=\'margin:4px 0;\'><a href=\''+f.path+'\' target=\'_blank\' style=\'color:#1976d2;text-decoration:none;\'>📄 '+fName+'</a>';"")
+        builder.append("infoHtml+=' <a href=\''+f.path+'\' download=\''+fName+'\' style=\'color:#666;font-size:11px;margin-left:8px;\'>⬇</a></div>';"")
+        builder.append("});")
+        builder.append("infoHtml+='</div>';"")
+        builder.append("}")
         builder.append("infoContent.innerHTML=infoHtml;")
         // Update media panel
         builder.append("updateMediaPanel(r);")
@@ -938,7 +949,8 @@ class ExportManager @Inject constructor(
         // Update media panel
         builder.append("function updateMediaPanel(region){")
         builder.append("const mediaContent=document.getElementById('mediaContent');")
-        builder.append("currentMediaList=region.contents||[];")
+        builder.append("const mediaOnly=(region.contents||[]).filter(c=>c.type==='photo'||c.type==='video');");
+        builder.append("currentMediaList=mediaOnly;")
         builder.append("document.getElementById('mediaCount').textContent=currentMediaList.length+' ${t.item}'+(currentMediaList.length!==1?'s':'');")
         builder.append("if(currentMediaList.length===0){")
         builder.append("mediaContent.innerHTML='<div class=\\'empty-state\\'><div class=\\'empty-state-icon\\'>📷</div><div>${t.noMediaForRegion}</div></div>';")
@@ -950,10 +962,6 @@ class ExportManager @Inject constructor(
         builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><img src=\\''+item.path+'\\' alt=\\'Photo\\' loading=\\'lazy\\'><div class=\\'media-caption\\'><span class=\\'media-type photo\\'>${t.photo}</span></div></div>';")
         builder.append("}else if(item.type==='video'){")
         builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><video src=\\''+item.path+'\\' preload=\\'metadata\\' muted></video><div class=\\'media-caption\\'><span class=\\'media-type video\\'>${t.video}</span></div></div>';")
-        builder.append("}else if(item.type==='file'){")
-        builder.append("const fileName=item.path.split('/').pop();")
-        builder.append("const fileExt=fileName.split('.').pop().toUpperCase();")
-        builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><div class=\\'file-icon\\'>📄</div><div class=\\'file-name\\'>'+fileName+'</div><div class=\\'media-caption\\'><span class=\\'media-type file\\'>'+fileExt+'</span></div></div>';")
         builder.append("}")
         builder.append("});")
         builder.append("html+='</div>';")
@@ -994,18 +1002,6 @@ class ExportManager @Inject constructor(
         builder.append("}else if(item.type==='video'){")
         builder.append("viewerContent.innerHTML='<video controls autoplay><source src=\\''+item.path+'\\' type=\\'video/mp4\\'>Your browser does not support video.</video>';")
         builder.append("viewerTitle.textContent='${t.video} - '+(currentRegion?currentRegion.name:'Project');")
-        builder.append("if(zoomControls)zoomControls.style.display='none';")
-        builder.append("}else if(item.type==='file'){")
-        builder.append("const fileName=item.path.split('/').pop();")
-        builder.append("const fileExt=fileName.split('.').pop().toLowerCase();")
-        builder.append("const viewableExts=['pdf','jpg','jpeg','png','gif','webp','svg','html','htm','txt','json','xml'];")
-        builder.append("const canPreview=viewableExts.includes(fileExt);")
-        builder.append("if(canPreview){")
-        builder.append("viewerContent.innerHTML='<iframe src=\\''+item.path+'\\' style=\\'width:100%;height:100%;border:none;\\'></iframe>';")
-        builder.append("}else{")
-        builder.append("viewerContent.innerHTML='<div style=\\'text-align:center;color:#fff;padding:40px;\\'><div style=\\'font-size:64px;margin-bottom:20px;\\'>📄</div><div style=\\'font-size:18px;margin-bottom:10px;\\'>'+fileName+'</div><div style=\\'color:#aaa;\\'>${t.cannotPreview}</div></div>';")
-        builder.append("}")
-        builder.append("viewerTitle.textContent='${t.file} - '+fileName;")
         builder.append("if(zoomControls)zoomControls.style.display='none';")
         builder.append("}")
         builder.append("document.getElementById('btnPrev').disabled=currentMediaIndex===0;")
@@ -1285,10 +1281,12 @@ class ExportManager @Inject constructor(
                 return ImportResult(success = false, error = "Invalid project file: missing project.json")
             }
             
-            // Copy photo to permanent storage
+            // Copy photo to permanent storage with proper permissions
             val photoPath = if (photoFile != null && photoFile!!.exists()) {
                 val permanentPhoto = File(mediaDir, "project_photo_${System.currentTimeMillis()}.jpg")
                 photoFile!!.copyTo(permanentPhoto, overwrite = true)
+                permanentPhoto.setReadable(true, false)
+                permanentPhoto.setWritable(true, false)
                 photoFile!!.delete()
                 permanentPhoto.absolutePath
             } else null
@@ -1351,6 +1349,8 @@ class ExportManager @Inject constructor(
                             }
                             val permanentMedia = File(mediaDir, "${contentType.name.lowercase()}_${regionId}_${System.currentTimeMillis()}$extension")
                             mediaFile.copyTo(permanentMedia, overwrite = true)
+                            permanentMedia.setReadable(true, false)
+                            permanentMedia.setWritable(true, false)
                             mediaFile.delete()
                             permanentMedia.absolutePath
                         } else contentData.data
@@ -1669,6 +1669,7 @@ class ExportManager @Inject constructor(
         val photo: String,
         val video: String,
         val file: String,
+        val files: String,
         val items: String,
         val item: String,
         // Viewer
@@ -1719,6 +1720,7 @@ class ExportManager @Inject constructor(
                         photo = "Фото",
                         video = "Видео",
                         file = "Файл",
+                        files = "Файлы",
                         items = "элементов",
                         item = "элемент",
                         prev = "◀ Назад",
@@ -1759,6 +1761,7 @@ class ExportManager @Inject constructor(
                         photo = "照片",
                         video = "视频",
                         file = "文件",
+                        files = "文件",
                         items = "项",
                         item = "项",
                         prev = "◀ 上一个",
@@ -1799,6 +1802,7 @@ class ExportManager @Inject constructor(
                         photo = "Photo",
                         video = "Video",
                         file = "File",
+                        files = "Files",
                         items = "items",
                         item = "item",
                         prev = "◀ Prev",
@@ -2104,6 +2108,7 @@ class ExportManager @Inject constructor(
         builder.append("photo:'${escapeJs(t.photo)}',")
         builder.append("video:'${escapeJs(t.video)}',")
         builder.append("file:'${escapeJs(t.file)}',")
+        builder.append("files:'${escapeJs(t.files)}',")
         builder.append("item:'${escapeJs(t.item)}',")
         builder.append("items:'${escapeJs(t.items)}',")
         builder.append("noMediaForRegion:'${escapeJs(t.noMediaForRegion)}',")
@@ -2224,13 +2229,25 @@ class ExportManager @Inject constructor(
         builder.append("if(r.type2)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>'+i18n.type2+'</div><div class=\\'info-value\\'>'+r.type2+'</div></div>';")
         builder.append("if(r.description)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>'+i18n.description+'</div><div class=\\'info-value\\'>'+r.description+'</div></div>';")
         builder.append("if(r.note)infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>'+i18n.note+'</div><div class=\\'info-value\\'>'+r.note+'</div></div>';")
+        // Add files section in info panel
+        builder.append("const files=(r.contents||[]).filter(c=>c.type==='file');")
+        builder.append("if(files.length>0){")
+        builder.append("infoHtml+='<div class=\\'info-section\\'><div class=\\'info-label\\'>'+i18n.files+'</div>';"")
+        builder.append("files.forEach(function(f){")
+        builder.append("const fName=f.path.split('/').pop();")
+        builder.append("infoHtml+='<div style=\\'margin:4px 0;\\'><a href=\\''+f.path+'\\' target=\\'_blank\\' style=\\'color:#1976d2;text-decoration:none;\\'>📄 '+fName+'</a>';"")
+        builder.append("infoHtml+=' <a href=\\''+f.path+'\\' download=\\''+fName+'\\' style=\\'color:#666;font-size:11px;margin-left:8px;\\'>⬇</a></div>';"")
+        builder.append("});")
+        builder.append("infoHtml+='</div>';"")
+        builder.append("}")
         builder.append("infoContent.innerHTML=infoHtml;")
         builder.append("updateMediaPanel(r);")
         builder.append("}")
         // Update media panel
         builder.append("function updateMediaPanel(region){")
         builder.append("const mediaContent=document.getElementById('mediaContent');")
-        builder.append("currentMediaList=region.contents||[];")
+        builder.append("const mediaOnly=(region.contents||[]).filter(c=>c.type==='photo'||c.type==='video');")
+        builder.append("currentMediaList=mediaOnly;")
         builder.append("document.getElementById('mediaCount').textContent=currentMediaList.length+' '+(currentMediaList.length===1?i18n.item:i18n.items);")
         builder.append("if(currentMediaList.length===0){")
         builder.append("mediaContent.innerHTML='<div class=\\'empty-state\\'><div class=\\'empty-state-icon\\'>📷</div><div>'+i18n.noMediaForRegion+'</div></div>';")
@@ -2242,10 +2259,6 @@ class ExportManager @Inject constructor(
         builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><img src=\\''+item.path+'\\' alt=\\'Photo\\' loading=\\'lazy\\'><div class=\\'media-caption\\'><span class=\\'media-type photo\\'>'+i18n.photo+'</span></div></div>';")
         builder.append("}else if(item.type==='video'){")
         builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><video src=\\''+item.path+'\\' preload=\\'metadata\\' muted></video><div class=\\'media-caption\\'><span class=\\'media-type video\\'>'+i18n.video+'</span></div></div>';")
-        builder.append("}else if(item.type==='file'){")
-        builder.append("const fileName=item.path.split('/').pop();")
-        builder.append("const fileExt=fileName.split('.').pop().toUpperCase();")
-        builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><div class=\\'file-icon\\'>📄</div><div class=\\'file-name\\'>'+fileName+'</div><div class=\\'media-caption\\'><span class=\\'media-type file\\'>'+fileExt+'</span></div></div>';")
         builder.append("}")
         builder.append("});")
         builder.append("html+='</div>';")
@@ -2282,18 +2295,6 @@ class ExportManager @Inject constructor(
         builder.append("}else if(item.type==='video'){")
         builder.append("viewerContent.innerHTML='<video controls autoplay><source src=\\''+item.path+'\\' type=\\'video/mp4\\'>Your browser does not support video.</video>';")
         builder.append("viewerTitle.textContent=i18n.video+' - '+(r?r.name:p?p.name:'Project');")
-        builder.append("if(zoomControls)zoomControls.style.display='none';")
-        builder.append("}else if(item.type==='file'){")
-        builder.append("const fileName=item.path.split('/').pop();")
-        builder.append("const fileExt=fileName.split('.').pop().toLowerCase();")
-        builder.append("const viewableExts=['pdf','jpg','jpeg','png','gif','webp','svg','html','htm','txt','json','xml'];")
-        builder.append("const canPreview=viewableExts.includes(fileExt);")
-        builder.append("if(canPreview){")
-        builder.append("viewerContent.innerHTML='<iframe src=\\''+item.path+'\\' style=\\'width:100%;height:100%;border:none;\\'></iframe>';")
-        builder.append("}else{")
-        builder.append("viewerContent.innerHTML='<div style=\\'text-align:center;color:#fff;padding:40px;\\'><div style=\\'font-size:64px;margin-bottom:20px;\\'>📄</div><div style=\\'font-size:18px;margin-bottom:10px;\\'>'+fileName+'</div><div style=\\'color:#aaa;\\'>'+i18n.cannotPreview+'</div></div>';")
-        builder.append("}")
-        builder.append("viewerTitle.textContent=i18n.file+' - '+fileName;")
         builder.append("if(zoomControls)zoomControls.style.display='none';")
         builder.append("}")
         builder.append("document.getElementById('btnPrev').disabled=currentMediaIndex===0;")
