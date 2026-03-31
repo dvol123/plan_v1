@@ -1439,11 +1439,13 @@ private fun FileThumbnail(
     // Get file name from originalFileName or extract from file path
     val fileName = remember(content.originalFileName, content.data) {
         // First try to use originalFileName if available
-        content.originalFileName?.ifBlank { null }
+        val name = content.originalFileName?.ifBlank { null }
             // Otherwise extract file name from the file path
             ?: content.data.substringAfterLast("/")
             ?: content.data.substringAfterLast("\\")
             ?: "File"
+        android.util.Log.d("FileThumbnail", "Displaying file: originalFileName=${content.originalFileName}, data=${content.data}, displayName=$name")
+        name
     }
     
     Card(

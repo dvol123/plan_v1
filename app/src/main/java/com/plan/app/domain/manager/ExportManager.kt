@@ -166,6 +166,9 @@ class ExportManager @Inject constructor(
                                 baseRelativePath
                             }
                             
+                            android.util.Log.d("ExportManager", "Exporting content: type=${content.type}, data=${content.data}, " +
+                                "originalFileName=${content.originalFileName}, relativePath=$relativePath")
+                            
                             contentExportList.add(
                                 ContentExportData(
                                     type = content.type.name,
@@ -1442,14 +1445,19 @@ class ExportManager @Inject constructor(
                         } else contentData.data
                     } else contentData.data
                     
+                    // Determine the original file name
+                    val determinedOriginalFileName = contentData.originalFileName?.ifBlank { null }
+                        ?: contentData.data.substringAfterLast("/")
+                    
+                    android.util.Log.d("ExportManager", "Importing content: type=$contentType, data=${contentData.data}, " +
+                        "originalFileName in JSON=${contentData.originalFileName}, determined=$determinedOriginalFileName")
+                    
                     contentRepository.insert(
                         Content(
                             regionId = regionId,
                             type = contentType,
                             data = contentPath,
-                            // Use originalFileName from JSON, or extract from path as fallback
-                            originalFileName = contentData.originalFileName?.ifBlank { null }
-                                ?: contentData.data.substringAfterLast("/"),
+                            originalFileName = determinedOriginalFileName,
                             sortOrder = contentData.sortOrder
                         )
                     )
