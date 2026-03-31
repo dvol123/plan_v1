@@ -97,7 +97,8 @@ fun RegionCardDialog(
     var showCameraPermissionDenied by remember { mutableStateOf(false) }
     var pendingMediaType by remember { mutableStateOf<MediaType?>(null) }
     
-    // Media deletion state
+    // Media deletion state - track content IDs marked for deletion
+    var deletedContentIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var showDeleteMediaDialog by remember { mutableStateOf(false) }
     var mediaToDelete by remember { mutableStateOf<Content?>(null) }
     
@@ -260,7 +261,10 @@ fun RegionCardDialog(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        mediaToDelete?.let { onDeleteMedia(it) }
+                        // Mark for deletion (will be applied on Save)
+                        mediaToDelete?.let { content ->
+                            deletedContentIds = deletedContentIds + content.id
+                        }
                         showDeleteMediaDialog = false
                         mediaToDelete = null
                     },
@@ -330,6 +334,7 @@ fun RegionCardDialog(
                     // Media gallery carousel
                     MediaGallerySection(
                         mediaContents = mediaContents,
+                        deletedContentIds = deletedContentIds,
                         isEditing = isEditing,
                         onMediaClick = { index ->
                             selectedMediaIndex = index
@@ -341,6 +346,10 @@ fun RegionCardDialog(
                                 mediaToDelete = content
                                 showDeleteMediaDialog = true
                             }
+                        },
+                        onUndoDelete = { contentId ->
+                            // Remove from deleted set (restore)
+                            deletedContentIds = deletedContentIds - contentId
                         },
                         onAddPhotoFromCamera = {
                             pendingMediaType = MediaType.PHOTO
@@ -479,13 +488,23 @@ fun RegionCardDialog(
                                     // Note: stateId will be set after state is created
                                     // For now, save without stateId - it will be updated when state is created
                                 }
+                                
+                                // Delete marked media content
+                                val contentsToDelete = region.contents.filter { it.id in deletedContentIds }
+                                contentsToDelete.forEach { content ->
+                                    onDeleteMedia(content)
+                                }
+                                
+                                // Save region with updated contents
+                                val updatedContents = region.contents.filter { it.id !in deletedContentIds }
                                 onSave(region.copy(
                                     name = name,
                                     stateId = selectedStateId,
                                     type1 = type1.ifBlank { null },
                                     type2 = type2.ifBlank { null },
                                     description = description.ifBlank { null },
-                                    note = note.ifBlank { null }
+                                    note = note.ifBlank { null },
+                                    contents = updatedContents
                                 ))
                             },
                             modifier = Modifier.fillMaxWidth()
@@ -504,20 +523,28 @@ fun RegionCardDialog(
     
     // Fullscreen media viewer
     if (showFullscreenMedia && mediaContents.isNotEmpty()) {
-        FullscreenMediaViewer(
-            mediaContents = mediaContents,
-            initialIndex = selectedMediaIndex,
-            onDismiss = { showFullscreenMedia = false }
-        )
+        // Filter out deleted content for fullscreen view
+        val visibleMediaContents = mediaContents.filter { it.id !in deletedContentIds }
+        if (visibleMediaContents.isNotEmpty()) {
+            // Adjust index to visible contents
+            val adjustedIndex = visibleMediaContents.indexOf(mediaContents.getOrNull(selectedMediaIndex)).coerceAtLeast(0)
+            FullscreenMediaViewer(
+                mediaContents = visibleMediaContents,
+                initialIndex = adjustedIndex,
+                onDismiss = { showFullscreenMedia = false }
+            )
+        }
     }
 }
 
 @Composable
 private fun MediaGallerySection(
     mediaContents: List<Content>,
+    deletedContentIds: Set<Long>,
     isEditing: Boolean,
     onMediaClick: (Int) -> Unit,
     onMediaLongPress: (Content) -> Unit,
+    onUndoDelete: (Long) -> Unit = {},
     onAddPhotoFromCamera: () -> Unit,
     onAddPhotoFromGallery: () -> Unit,
     onAddVideoFromCamera: () -> Unit,
@@ -542,10 +569,14 @@ private fun MediaGallerySection(
             } else {
                 // Existing media items
                 items(mediaContents.indices.toList()) { index ->
+                    val content = mediaContents[index]
+                    val isDeleted = content.id in deletedContentIds
                     MediaThumbnail(
-                        content = mediaContents[index],
-                        onClick = { onMediaClick(index) },
-                        onLongClick = { onMediaLongPress(mediaContents[index]) },
+                        content = content,
+                        isDeleted = isDeleted,
+                        onClick = { if (!isDeleted) onMediaClick(index) },
+                        onLongClick = { if (!isDeleted && isEditing) onMediaLongPress(content) },
+                        onUndoDelete = { onUndoDelete(content.id) },
                         isEditing = isEditing
                     )
                 }
@@ -618,21 +649,23 @@ private fun MediaPlaceholder() {
 @Composable
 private fun MediaThumbnail(
     content: Content,
+    isDeleted: Boolean = false,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
+    onUndoDelete: () -> Unit = {},
     isEditing: Boolean = false
 ) {
     Card(
         modifier = Modifier
             .size(80.dp)
             .then(
-                if (isEditing) {
-                    Modifier.combinedClickable(
+                when {
+                    isDeleted -> Modifier.clickable { onUndoDelete() }
+                    isEditing -> Modifier.combinedClickable(
                         onClick = onClick,
                         onLongClick = onLongClick
                     )
-                } else {
-                    Modifier.clickable(onClick = onClick)
+                    else -> Modifier.clickable(onClick = onClick)
                 }
             ),
         shape = RoundedCornerShape(8.dp)
@@ -669,6 +702,34 @@ private fun MediaThumbnail(
                 }
                 ContentType.TEXT -> {
                     // Text content is not shown in gallery
+                }
+            }
+            
+            // Deleted overlay
+            if (isDeleted) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.error.copy(alpha = 0.7f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Deleted",
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.tap_to_restore),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
         }

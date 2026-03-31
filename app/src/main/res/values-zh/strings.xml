@@ -37,6 +37,7 @@
     <string name="project_name_edit">项目名称</string>
     <string name="delete_media">删除媒体</string>
     <string name="delete_media_confirmation">确定要删除此媒体文件吗？</string>
+    <string name="tap_to_restore">点击恢复</string>
     <string name="add_from_gallery">从相册添加</string>
     <string name="project_name">名称</string>
     <string name="project_name_label">项目：%s</string>

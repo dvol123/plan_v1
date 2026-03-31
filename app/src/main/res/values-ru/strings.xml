@@ -37,6 +37,7 @@
     <string name="project_name_edit">Название проекта</string>
     <string name="delete_media">Удалить медиа</string>
     <string name="delete_media_confirmation">Вы уверены, что хотите удалить этот медиафайл?</string>
+    <string name="tap_to_restore">Нажмите для восстановления</string>
     <string name="add_from_gallery">Добавить из галереи</string>
     <string name="project_name">Название</string>
     <string name="project_name_label">Проект: %s</string>
