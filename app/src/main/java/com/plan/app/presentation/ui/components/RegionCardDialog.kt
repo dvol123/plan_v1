@@ -26,7 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
+
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -1485,7 +1485,7 @@ private fun FileThumbnail(
             )
             "txt" -> FileInfo(
                 extension = ext,
-                icon = Icons.AutoMirrored.Filled.Article,
+                icon = Icons.Default.Description,
                 color = Color(0xFF757575), // Gray for text
                 label = "TXT"
             )
@@ -1503,7 +1503,7 @@ private fun FileThumbnail(
             )
             else -> FileInfo(
                 extension = ext,
-                icon = Icons.AutoMirrored.Filled.InsertDriveFile,
+                icon = Icons.Default.InsertDriveFile,
                 color = Color(0xFF607D8B), // Blue gray for unknown
                 label = ext.uppercase().take(3)
             )
