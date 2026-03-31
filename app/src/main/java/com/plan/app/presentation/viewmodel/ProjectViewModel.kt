@@ -502,18 +502,32 @@ class ProjectViewModel @Inject constructor(
                 mediaDir.mkdirs()
             }
             
-            // Create unique filename
+            // Get original file name from URI
+            val originalFileName = getOriginalFileName(context, sourceUri, type)
+            
+            // Create unique filename preserving original name
             val timestamp = System.currentTimeMillis()
-            val extension = when (type) {
-                "photo" -> "jpg"
-                "video" -> "mp4"
-                "file" -> {
-                    // Try to get extension from URI
-                    sourceUri.lastPathSegment?.substringAfterLast(".", "bin") ?: "bin"
+            val fileName = if (originalFileName.isNotBlank()) {
+                // Preserve original name but make it unique with timestamp
+                val nameWithoutExt = originalFileName.substringBeforeLast(".", originalFileName)
+                val extension = originalFileName.substringAfterLast(".", "").ifEmpty {
+                    when (type) {
+                        "photo" -> "jpg"
+                        "video" -> "mp4"
+                        else -> "bin"
+                    }
                 }
-                else -> "bin"
+                "${nameWithoutExt}_$timestamp.$extension"
+            } else {
+                // Fallback to generic name
+                val extension = when (type) {
+                    "photo" -> "jpg"
+                    "video" -> "mp4"
+                    "file" -> sourceUri.lastPathSegment?.substringAfterLast(".", "bin") ?: "bin"
+                    else -> "bin"
+                }
+                "${type}_${regionId}_$timestamp.$extension"
             }
-            val fileName = "${type}_${regionId}_$timestamp.$extension"
             val destFile = File(mediaDir, fileName)
             
             if (type == "photo") {
@@ -529,6 +543,28 @@ class ProjectViewModel @Inject constructor(
             }
             
             destFile.absolutePath
+        }
+    }
+    
+    /**
+     * Get the original file name from a content URI.
+     */
+    private fun getOriginalFileName(context: Context, uri: Uri, type: String): String {
+        return try {
+            // Try to get display name from ContentResolver
+            val cursor = context.contentResolver.query(uri, null, null, null, null)
+            cursor?.use {
+                val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (nameIndex >= 0 && it.moveToFirst()) {
+                    return it.getString(nameIndex) ?: ""
+                }
+            }
+            
+            // Fallback: try to get from URI path
+            uri.lastPathSegment?.substringAfterLast("/") ?: ""
+        } catch (e: Exception) {
+            android.util.Log.e("ProjectViewModel", "Failed to get original file name", e)
+            ""
         }
     }
     

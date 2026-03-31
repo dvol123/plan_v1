@@ -404,7 +404,7 @@ class ExportManager @Inject constructor(
         builder.append(".info-section{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #eee;}")
         builder.append(".info-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}")
         builder.append(".info-label{font-weight:600;color:#666;font-size:12px;text-transform:uppercase;margin-bottom:4px;}")
-        builder.append(".info-value{color:#333;line-height:1.5;}")
+        builder.append(".info-value{color:#333;line-height:1.5;white-space:pre-wrap;}")
         builder.append(".info-value.empty{color:#999;font-style:italic;}")
         // Media panel styles
         builder.append(".media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;}")
@@ -668,7 +668,7 @@ class ExportManager @Inject constructor(
         builder.append(".info-section{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #eee;}")
         builder.append(".info-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}")
         builder.append(".info-label{font-weight:600;color:#666;font-size:12px;text-transform:uppercase;margin-bottom:4px;}")
-        builder.append(".info-value{color:#333;line-height:1.5;word-wrap:break-word;}")
+        builder.append(".info-value{color:#333;line-height:1.5;word-wrap:break-word;white-space:pre-wrap;}")
         builder.append(".info-value.empty{color:#999;font-style:italic;}")
         // Media panel styles
         builder.append(".media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;}")
@@ -699,7 +699,7 @@ class ExportManager @Inject constructor(
         builder.append(".viewer-counter{color:#aaa;font-size:13px;}")
         // Zoom controls
         builder.append(".zoom-controls{display:flex;align-items:center;gap:4px;margin-right:16px;padding-right:16px;border-right:1px solid rgba(255,255,255,0.2);}")
-        builder.append(".zoom-btn{background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:14px;transition:background 0.2s;min-width:36px;text-align:center;}")
+        builder.append(".zoom-btn{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:18px;font-weight:bold;transition:background 0.2s;min-width:40px;text-align:center;}")
         builder.append(".zoom-btn:hover{background:rgba(255,255,255,0.2);}")
         builder.append(".zoom-level{color:#fff;font-size:12px;min-width:45px;text-align:center;font-family:monospace;}")
         // Empty state
@@ -1734,8 +1734,8 @@ class ExportManager @Inject constructor(
                         allStates = "Все состояния",
                         searchPlaceholder = "Поиск...",
                         noResultsFound = "Ничего не найдено",
-                        zoomIn = "🔍+",
-                        zoomOut = "🔍-",
+                        zoomIn = "+",
+                        zoomOut = "−",
                         resetZoom = "↺ Сброс",
                         download = "⬇ Скачать",
                         downloadFile = "Скачать файл",
@@ -1775,8 +1775,8 @@ class ExportManager @Inject constructor(
                         allStates = "所有状态",
                         searchPlaceholder = "搜索...",
                         noResultsFound = "未找到结果",
-                        zoomIn = "🔍+",
-                        zoomOut = "🔍-",
+                        zoomIn = "+",
+                        zoomOut = "−",
                         resetZoom = "↺ 重置",
                         download = "⬇ 下载",
                         downloadFile = "下载文件",
@@ -1816,8 +1816,8 @@ class ExportManager @Inject constructor(
                         allStates = "All States",
                         searchPlaceholder = "Search...",
                         noResultsFound = "No results found",
-                        zoomIn = "🔍+",
-                        zoomOut = "🔍-",
+                        zoomIn = "+",
+                        zoomOut = "−",
                         resetZoom = "↺ Reset",
                         download = "⬇ Download",
                         downloadFile = "Download File",
@@ -1899,7 +1899,7 @@ class ExportManager @Inject constructor(
         builder.append(".info-section{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #eee;}")
         builder.append(".info-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}")
         builder.append(".info-label{font-weight:600;color:#666;font-size:12px;text-transform:uppercase;margin-bottom:4px;}")
-        builder.append(".info-value{color:#333;line-height:1.5;word-wrap:break-word;}")
+        builder.append(".info-value{color:#333;line-height:1.5;word-wrap:break-word;white-space:pre-wrap;}")
         // Media panel styles
         builder.append(".media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;}")
         builder.append(".media-item{background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);transition:transform 0.2s,box-shadow 0.2s;cursor:pointer;}")
@@ -1929,7 +1929,7 @@ class ExportManager @Inject constructor(
         builder.append(".viewer-counter{color:#aaa;font-size:13px;}")
         // Zoom controls
         builder.append(".zoom-controls{display:flex;align-items:center;gap:4px;margin-right:16px;padding-right:16px;border-right:1px solid rgba(255,255,255,0.2);}")
-        builder.append(".zoom-btn{background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:14px;transition:background 0.2s;min-width:36px;text-align:center;}")
+        builder.append(".zoom-btn{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:18px;font-weight:bold;transition:background 0.2s;min-width:40px;text-align:center;}")
         builder.append(".zoom-btn:hover{background:rgba(255,255,255,0.2);}")
         builder.append(".zoom-level{color:#fff;font-size:12px;min-width:45px;text-align:center;font-family:monospace;}")
         // Empty state
