@@ -1505,7 +1505,7 @@ private fun FileThumbnail(
             else -> FileInfo(
                 extension = ext,
                 icon = Icons.AutoMirrored.Filled.InsertDriveFile,
-                color = MaterialTheme.colorScheme.primary,
+                color = Color(0xFF607D8B), // Blue gray for unknown
                 label = ext.uppercase().take(3)
             )
         }
