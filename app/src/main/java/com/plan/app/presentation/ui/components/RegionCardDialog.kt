@@ -1436,14 +1436,14 @@ private fun FileThumbnail(
     onUndoDelete: () -> Unit = {},
     isEditing: Boolean = false
 ) {
-    // Get file name from URI
-    val fileName = remember(content.data) {
-        try {
-            val uri = Uri.parse(content.data)
-            uri.lastPathSegment ?: "File"
-        } catch (e: Exception) {
-            "File"
-        }
+    // Get file name from originalFileName or extract from file path
+    val fileName = remember(content.originalFileName, content.data) {
+        // First try to use originalFileName if available
+        content.originalFileName?.ifBlank { null }
+            // Otherwise extract file name from the file path
+            ?: content.data.substringAfterLast("/")
+            ?: content.data.substringAfterLast("\\")
+            ?: "File"
     }
     
     Card(
