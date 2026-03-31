@@ -10,6 +10,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -334,8 +335,8 @@ fun RegionCardDialog(
                             selectedMediaIndex = index
                             showFullscreenMedia = true
                         },
-                        onMediaDoubleTap = { content ->
-                            // Double tap to delete (in editing mode)
+                        onMediaLongPress = { content ->
+                            // Long press to delete (in editing mode)
                             if (isEditing) {
                                 mediaToDelete = content
                                 showDeleteMediaDialog = true
@@ -516,7 +517,7 @@ private fun MediaGallerySection(
     mediaContents: List<Content>,
     isEditing: Boolean,
     onMediaClick: (Int) -> Unit,
-    onMediaDoubleTap: (Content) -> Unit,
+    onMediaLongPress: (Content) -> Unit,
     onAddPhotoFromCamera: () -> Unit,
     onAddPhotoFromGallery: () -> Unit,
     onAddVideoFromCamera: () -> Unit,
@@ -544,7 +545,7 @@ private fun MediaGallerySection(
                     MediaThumbnail(
                         content = mediaContents[index],
                         onClick = { onMediaClick(index) },
-                        onDoubleTap = { onMediaDoubleTap(mediaContents[index]) },
+                        onLongClick = { onMediaLongPress(mediaContents[index]) },
                         isEditing = isEditing
                     )
                 }
@@ -613,13 +614,22 @@ private fun MediaPlaceholder() {
 private fun MediaThumbnail(
     content: Content,
     onClick: () -> Unit,
-    @Suppress("UNUSED_PARAMETER") onDoubleTap: () -> Unit = {},
-    @Suppress("UNUSED_PARAMETER") isEditing: Boolean = false
+    onLongClick: () -> Unit = {},
+    isEditing: Boolean = false
 ) {
     Card(
         modifier = Modifier
             .size(80.dp)
-            .clickable(onClick = onClick),
+            .then(
+                if (isEditing) {
+                    Modifier.combinedClickable(
+                        onClick = onClick,
+                        onLongClick = onLongClick
+                    )
+                } else {
+                    Modifier.clickable(onClick = onClick)
+                }
+            ),
         shape = RoundedCornerShape(8.dp)
     ) {
         Box(
