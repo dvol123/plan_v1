@@ -797,7 +797,7 @@ private fun MediaThumbnail(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.AutoMirrored.Filled.InsertDriveFile,
+                            Icons.Default.Description,
                             contentDescription = "File",
                             modifier = Modifier.size(40.dp),
                             tint = MaterialTheme.colorScheme.primary
@@ -1503,7 +1503,7 @@ private fun FileThumbnail(
             )
             else -> FileInfo(
                 extension = ext,
-                icon = Icons.Default.InsertDriveFile,
+                icon = Icons.Default.Description,
                 color = Color(0xFF607D8B), // Blue gray for unknown
                 label = ext.uppercase().take(3)
             )
