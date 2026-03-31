@@ -557,6 +557,8 @@ private fun MediaGallerySection(
                     AddMediaButtonWithMenu(
                         text = stringResource(R.string.add_photo),
                         icon = Icons.Default.AddAPhoto,
+                        cameraText = stringResource(R.string.take_photo),
+                        galleryText = stringResource(R.string.add_from_gallery),
                         onCameraClick = onAddPhotoFromCamera,
                         onGalleryClick = onAddPhotoFromGallery
                     )
@@ -566,6 +568,8 @@ private fun MediaGallerySection(
                     AddMediaButtonWithMenu(
                         text = stringResource(R.string.add_video),
                         icon = Icons.Default.VideoCall,
+                        cameraText = stringResource(R.string.take_video),
+                        galleryText = stringResource(R.string.add_from_gallery),
                         onCameraClick = onAddVideoFromCamera,
                         onGalleryClick = onAddVideoFromGallery
                     )
@@ -709,6 +713,8 @@ private fun AddMediaButton(
 private fun AddMediaButtonWithMenu(
     text: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    cameraText: String,
+    galleryText: String,
     onCameraClick: () -> Unit,
     onGalleryClick: () -> Unit
 ) {
@@ -748,7 +754,7 @@ private fun AddMediaButtonWithMenu(
             onDismissRequest = { expanded = false }
         ) {
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.take_photo)) },
+                text = { Text(cameraText) },
                 onClick = {
                     expanded = false
                     onCameraClick()
@@ -758,7 +764,7 @@ private fun AddMediaButtonWithMenu(
                 }
             )
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.add_from_gallery)) },
+                text = { Text(galleryText) },
                 onClick = {
                     expanded = false
                     onGalleryClick()

@@ -97,6 +97,7 @@
     
     <!-- Camera -->
     <string name="take_photo">Сделать фото</string>
+    <string name="take_video">Записать видео</string>
     <string name="choose_from_gallery">Выбрать из галереи</string>
     
     <!-- Permissions -->

@@ -97,6 +97,7 @@
     
     <!-- Camera -->
     <string name="take_photo">拍照</string>
+    <string name="take_video">录制视频</string>
     <string name="choose_from_gallery">从相册选择</string>
     
     <!-- Permissions -->
