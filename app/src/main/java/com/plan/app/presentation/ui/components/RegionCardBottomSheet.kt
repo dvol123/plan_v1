@@ -5,8 +5,10 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -286,6 +288,7 @@ fun RegionCardBottomSheet(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 @Suppress("UNUSED_PARAMETER")
 @Composable
@@ -298,7 +301,10 @@ fun MediaThumbnail(
     Card(
         modifier = Modifier
             .size(80.dp)
-            .clickable(onClick = onClick),
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(8.dp)
     ) {
         Box(
