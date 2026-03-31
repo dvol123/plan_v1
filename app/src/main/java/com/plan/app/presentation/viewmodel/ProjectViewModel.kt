@@ -390,6 +390,9 @@ class ProjectViewModel @Inject constructor(
             try {
                 android.util.Log.d("ProjectViewModel", "Adding photo to region $regionId, uri: $uri")
                 
+                // Get original file name first
+                val originalFileName = getOriginalFileName(context, uri, "photo")
+                
                 // Copy file to app's permanent storage
                 val savedPath = copyMediaToPermanentStorage(context, uri, regionId, "photo")
                 android.util.Log.d("ProjectViewModel", "Photo saved to: $savedPath")
@@ -397,11 +400,12 @@ class ProjectViewModel @Inject constructor(
                 // Get next sort order
                 val sortOrder = manageContentUseCase.getByRegionOnce(regionId).size
                 
-                // Create content record
+                // Create content record with original file name
                 val content = Content(
                     regionId = regionId,
                     type = ContentType.PHOTO,
                     data = savedPath,
+                    originalFileName = originalFileName.ifBlank { null },
                     sortOrder = sortOrder
                 )
                 val contentId = manageContentUseCase.add(content)
@@ -422,6 +426,9 @@ class ProjectViewModel @Inject constructor(
             try {
                 android.util.Log.d("ProjectViewModel", "Adding video to region $regionId, uri: $uri")
                 
+                // Get original file name first
+                val originalFileName = getOriginalFileName(context, uri, "video")
+                
                 // Copy file to app's permanent storage
                 val savedPath = copyMediaToPermanentStorage(context, uri, regionId, "video")
                 android.util.Log.d("ProjectViewModel", "Video saved to: $savedPath")
@@ -429,11 +436,12 @@ class ProjectViewModel @Inject constructor(
                 // Get next sort order
                 val sortOrder = manageContentUseCase.getByRegionOnce(regionId).size
                 
-                // Create content record
+                // Create content record with original file name
                 val content = Content(
                     regionId = regionId,
                     type = ContentType.VIDEO,
                     data = savedPath,
+                    originalFileName = originalFileName.ifBlank { null },
                     sortOrder = sortOrder
                 )
                 val contentId = manageContentUseCase.add(content)
@@ -454,6 +462,9 @@ class ProjectViewModel @Inject constructor(
             try {
                 android.util.Log.d("ProjectViewModel", "Adding file to region $regionId, uri: $uri")
                 
+                // Get original file name first
+                val originalFileName = getOriginalFileName(context, uri, "file")
+                
                 // Copy file to app's permanent storage
                 val savedPath = copyMediaToPermanentStorage(context, uri, regionId, "file")
                 android.util.Log.d("ProjectViewModel", "File saved to: $savedPath")
@@ -461,11 +472,12 @@ class ProjectViewModel @Inject constructor(
                 // Get next sort order
                 val sortOrder = manageContentUseCase.getByRegionOnce(regionId).size
                 
-                // Create content record
+                // Create content record with original file name
                 val content = Content(
                     regionId = regionId,
                     type = ContentType.FILE,
                     data = savedPath,
+                    originalFileName = originalFileName.ifBlank { null },
                     sortOrder = sortOrder
                 )
                 val contentId = manageContentUseCase.add(content)

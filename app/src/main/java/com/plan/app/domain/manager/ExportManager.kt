@@ -64,6 +64,7 @@ data class CellExportData(
 data class ContentExportData(
     val type: String,
     val data: String,
+    val originalFileName: String? = null,
     val sortOrder: Int
 )
 
@@ -123,14 +124,28 @@ class ExportManager @Inject constructor(
                         val contentExportList = mutableListOf<ContentExportData>()
                         
                         contents.forEachIndexed { index, content ->
+                            // Use original file name if available, otherwise generate one
                             val relativePath = when (content.type) {
-                                ContentType.PHOTO -> "media/photo_${region.id}_$index.jpg"
-                                ContentType.VIDEO -> "media/video_${region.id}_$index.mp4"
+                                ContentType.PHOTO -> {
+                                    val ext = content.originalFileName?.substringAfterLast(".", "jpg") ?: "jpg"
+                                    val baseName = content.originalFileName?.substringBeforeLast(".")
+                                        ?: "photo_${region.id}_$index"
+                                    "media/$baseName.$ext"
+                                }
+                                ContentType.VIDEO -> {
+                                    val ext = content.originalFileName?.substringAfterLast(".", "mp4") ?: "mp4"
+                                    val baseName = content.originalFileName?.substringBeforeLast(".")
+                                        ?: "video_${region.id}_$index"
+                                    "media/$baseName.$ext"
+                                }
                                 ContentType.TEXT -> content.data
                                 ContentType.FILE -> {
                                     val sourceFile = getFileFromUri(content.data)
-                                    val extension = sourceFile?.extension?.ifEmpty { "bin" } ?: "bin"
-                                    "media/file_${region.id}_$index.$extension"
+                                    val ext = content.originalFileName?.substringAfterLast(".")
+                                        ?: sourceFile?.extension?.ifEmpty { "bin" } ?: "bin"
+                                    val baseName = content.originalFileName?.substringBeforeLast(".")
+                                        ?: "file_${region.id}_$index"
+                                    "media/$baseName.$ext"
                                 }
                             }
                             
@@ -138,6 +153,7 @@ class ExportManager @Inject constructor(
                                 ContentExportData(
                                     type = content.type.name,
                                     data = relativePath,
+                                    originalFileName = content.originalFileName,
                                     sortOrder = content.sortOrder
                                 )
                             )
@@ -222,7 +238,11 @@ class ExportManager @Inject constructor(
                             ContentType.PHOTO -> {
                                 val sourceFile = getFileFromUri(content.data)
                                 if (sourceFile != null && sourceFile.exists()) {
-                                    val fileName = "photo_$photoIndex.jpg"
+                                    // Use original file name if available
+                                    val ext = content.originalFileName?.substringAfterLast(".", "jpg") ?: "jpg"
+                                    val baseName = content.originalFileName?.substringBeforeLast(".")
+                                        ?: "photo_$photoIndex"
+                                    val fileName = "$baseName.$ext"
                                     sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
                                     contentInfos.add(ContentExportInfo("photo", "$safeName/$fileName"))
                                     photoIndex++
@@ -231,7 +251,11 @@ class ExportManager @Inject constructor(
                             ContentType.VIDEO -> {
                                 val sourceFile = getFileFromUri(content.data)
                                 if (sourceFile != null && sourceFile.exists()) {
-                                    val fileName = "video_$videoIndex.mp4"
+                                    // Use original file name if available
+                                    val ext = content.originalFileName?.substringAfterLast(".", "mp4") ?: "mp4"
+                                    val baseName = content.originalFileName?.substringBeforeLast(".")
+                                        ?: "video_$videoIndex"
+                                    val fileName = "$baseName.$ext"
                                     sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
                                     contentInfos.add(ContentExportInfo("video", "$safeName/$fileName"))
                                     videoIndex++
@@ -240,10 +264,14 @@ class ExportManager @Inject constructor(
                             ContentType.FILE -> {
                                 val sourceFile = getFileFromUri(content.data)
                                 if (sourceFile != null && sourceFile.exists()) {
-                                    val extension = sourceFile.extension.ifEmpty { "bin" }
-                                    val fileName = "file_${fileIndex}.${extension}"
+                                    // Use original file name if available
+                                    val ext = content.originalFileName?.substringAfterLast(".")
+                                        ?: sourceFile.extension.ifEmpty { "bin" }
+                                    val baseName = content.originalFileName?.substringBeforeLast(".")
+                                        ?: "file_$fileIndex"
+                                    val fileName = "$baseName.$ext"
                                     sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
-                                    contentInfos.add(ContentExportInfo("file", "${safeName}/${fileName}"))
+                                    contentInfos.add(ContentExportInfo("file", "${safeName}/$fileName"))
                                     fileIndex++
                                 }
                             }
@@ -697,11 +725,11 @@ class ExportManager @Inject constructor(
         builder.append(".viewer-content video{max-width:100%;max-height:100%;border-radius:4px;}")
         builder.append(".viewer-footer{display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 16px;background:#2a2a2a;flex-shrink:0;}")
         builder.append(".viewer-counter{color:#aaa;font-size:13px;}")
-        // Zoom controls
-        builder.append(".zoom-controls{display:flex;align-items:center;gap:4px;margin-right:16px;padding-right:16px;border-right:1px solid rgba(255,255,255,0.2);}")
-        builder.append(".zoom-btn{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:18px;font-weight:bold;transition:background 0.2s;min-width:40px;text-align:center;}")
-        builder.append(".zoom-btn:hover{background:rgba(255,255,255,0.2);}")
-        builder.append(".zoom-level{color:#fff;font-size:12px;min-width:45px;text-align:center;font-family:monospace;}")
+        // Zoom controls - prominent blue buttons
+        builder.append(".zoom-controls{display:flex;align-items:center;gap:8px;margin-right:16px;padding-right:16px;border-right:1px solid rgba(255,255,255,0.2);}")
+        builder.append(".zoom-btn{background:#1976d2;border:2px solid #fff;color:#fff;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:20px;font-weight:bold;transition:background 0.2s;min-width:50px;text-align:center;}")
+        builder.append(".zoom-btn:hover{background:#1565c0;}")
+        builder.append(".zoom-level{color:#fff;font-size:14px;min-width:50px;text-align:center;font-family:monospace;font-weight:bold;}")
         // Empty state
         builder.append(".empty-state{text-align:center;padding:40px 20px;color:#999;}")
         builder.append(".empty-state-icon{font-size:48px;margin-bottom:16px;opacity:0.5;}")
@@ -1361,6 +1389,7 @@ class ExportManager @Inject constructor(
                             regionId = regionId,
                             type = contentType,
                             data = contentPath,
+                            originalFileName = contentData.originalFileName,
                             sortOrder = contentData.sortOrder
                         )
                     )
@@ -1453,7 +1482,11 @@ class ExportManager @Inject constructor(
                             ContentType.PHOTO -> {
                                 val sourceFile = getFileFromUri(content.data)
                                 if (sourceFile != null && sourceFile.exists()) {
-                                    val fileName = "photo_$photoIndex.jpg"
+                                    // Use original file name if available
+                                    val ext = content.originalFileName?.substringAfterLast(".", "jpg") ?: "jpg"
+                                    val baseName = content.originalFileName?.substringBeforeLast(".")
+                                        ?: "photo_$photoIndex"
+                                    val fileName = "$baseName.$ext"
                                     sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
                                     contentInfos.add(ContentExportInfo("photo", "$safeName/$fileName"))
                                     photoIndex++
@@ -1462,7 +1495,11 @@ class ExportManager @Inject constructor(
                             ContentType.VIDEO -> {
                                 val sourceFile = getFileFromUri(content.data)
                                 if (sourceFile != null && sourceFile.exists()) {
-                                    val fileName = "video_$videoIndex.mp4"
+                                    // Use original file name if available
+                                    val ext = content.originalFileName?.substringAfterLast(".", "mp4") ?: "mp4"
+                                    val baseName = content.originalFileName?.substringBeforeLast(".")
+                                        ?: "video_$videoIndex"
+                                    val fileName = "$baseName.$ext"
                                     sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
                                     contentInfos.add(ContentExportInfo("video", "$safeName/$fileName"))
                                     videoIndex++
@@ -1471,10 +1508,14 @@ class ExportManager @Inject constructor(
                             ContentType.FILE -> {
                                 val sourceFile = getFileFromUri(content.data)
                                 if (sourceFile != null && sourceFile.exists()) {
-                                    val extension = sourceFile.extension.ifEmpty { "bin" }
-                                    val fileName = "file_${fileIndex}.${extension}"
+                                    // Use original file name if available
+                                    val ext = content.originalFileName?.substringAfterLast(".")
+                                        ?: sourceFile.extension.ifEmpty { "bin" }
+                                    val baseName = content.originalFileName?.substringBeforeLast(".")
+                                        ?: "file_$fileIndex"
+                                    val fileName = "$baseName.$ext"
                                     sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
-                                    contentInfos.add(ContentExportInfo("file", "${safeName}/${fileName}"))
+                                    contentInfos.add(ContentExportInfo("file", "${safeName}/$fileName"))
                                     fileIndex++
                                 }
                             }
@@ -1569,7 +1610,11 @@ class ExportManager @Inject constructor(
                                 ContentType.PHOTO -> {
                                     val sourceFile = getFileFromUri(content.data)
                                     if (sourceFile != null && sourceFile.exists()) {
-                                        val fileName = "photo_$photoIndex.jpg"
+                                        // Use original file name if available
+                                        val ext = content.originalFileName?.substringAfterLast(".", "jpg") ?: "jpg"
+                                        val baseName = content.originalFileName?.substringBeforeLast(".")
+                                            ?: "photo_$photoIndex"
+                                        val fileName = "$baseName.$ext"
                                         sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
                                         contentInfos.add(ContentExportInfo("photo", "$regionFolder/$fileName"))
                                         photoIndex++
@@ -1578,7 +1623,11 @@ class ExportManager @Inject constructor(
                                 ContentType.VIDEO -> {
                                     val sourceFile = getFileFromUri(content.data)
                                     if (sourceFile != null && sourceFile.exists()) {
-                                        val fileName = "video_$videoIndex.mp4"
+                                        // Use original file name if available
+                                        val ext = content.originalFileName?.substringAfterLast(".", "mp4") ?: "mp4"
+                                        val baseName = content.originalFileName?.substringBeforeLast(".")
+                                            ?: "video_$videoIndex"
+                                        val fileName = "$baseName.$ext"
                                         sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
                                         contentInfos.add(ContentExportInfo("video", "$regionFolder/$fileName"))
                                         videoIndex++
@@ -1587,10 +1636,14 @@ class ExportManager @Inject constructor(
                                 ContentType.FILE -> {
                                     val sourceFile = getFileFromUri(content.data)
                                     if (sourceFile != null && sourceFile.exists()) {
-                                        val extension = sourceFile.extension.ifEmpty { "bin" }
-                                        val fileName = "file_${fileIndex}.${extension}"
+                                        // Use original file name if available
+                                        val ext = content.originalFileName?.substringAfterLast(".")
+                                            ?: sourceFile.extension.ifEmpty { "bin" }
+                                        val baseName = content.originalFileName?.substringBeforeLast(".")
+                                            ?: "file_$fileIndex"
+                                        val fileName = "$baseName.$ext"
                                         sourceFile.copyTo(File(regionDir, fileName), overwrite = true)
-                                        contentInfos.add(ContentExportInfo("file", "${regionFolder}/${fileName}"))
+                                        contentInfos.add(ContentExportInfo("file", "${regionFolder}/$fileName"))
                                         fileIndex++
                                     }
                                 }
@@ -1927,11 +1980,11 @@ class ExportManager @Inject constructor(
         builder.append(".viewer-content video{max-width:100%;max-height:100%;border-radius:4px;}")
         builder.append(".viewer-footer{display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 16px;background:#2a2a2a;flex-shrink:0;}")
         builder.append(".viewer-counter{color:#aaa;font-size:13px;}")
-        // Zoom controls
-        builder.append(".zoom-controls{display:flex;align-items:center;gap:4px;margin-right:16px;padding-right:16px;border-right:1px solid rgba(255,255,255,0.2);}")
-        builder.append(".zoom-btn{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:18px;font-weight:bold;transition:background 0.2s;min-width:40px;text-align:center;}")
-        builder.append(".zoom-btn:hover{background:rgba(255,255,255,0.2);}")
-        builder.append(".zoom-level{color:#fff;font-size:12px;min-width:45px;text-align:center;font-family:monospace;}")
+        // Zoom controls - prominent blue buttons
+        builder.append(".zoom-controls{display:flex;align-items:center;gap:8px;margin-right:16px;padding-right:16px;border-right:1px solid rgba(255,255,255,0.2);}")
+        builder.append(".zoom-btn{background:#1976d2;border:2px solid #fff;color:#fff;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:20px;font-weight:bold;transition:background 0.2s;min-width:50px;text-align:center;}")
+        builder.append(".zoom-btn:hover{background:#1565c0;}")
+        builder.append(".zoom-level{color:#fff;font-size:14px;min-width:50px;text-align:center;font-family:monospace;font-weight:bold;}")
         // Empty state
         builder.append(".empty-state{text-align:center;padding:40px 20px;color:#999;}")
         builder.append(".empty-state-icon{font-size:48px;margin-bottom:16px;opacity:0.5;}")

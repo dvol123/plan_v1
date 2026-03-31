@@ -59,6 +59,7 @@ class ContentRepositoryImpl @Inject constructor(
                 com.plan.app.data.local.entity.ContentType.FILE -> ContentType.FILE
             },
             data = data,
+            originalFileName = originalFileName,
             sortOrder = sortOrder,
             createdAt = createdAt
         )
@@ -75,6 +76,7 @@ class ContentRepositoryImpl @Inject constructor(
                 ContentType.FILE -> com.plan.app.data.local.entity.ContentType.FILE
             },
             data = data,
+            originalFileName = originalFileName,
             sortOrder = sortOrder,
             createdAt = createdAt
         )

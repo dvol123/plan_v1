@@ -29,6 +29,7 @@ data class ContentEntity(
     val regionId: Long,
     val type: ContentType,
     val data: String,
+    val originalFileName: String? = null,
     val sortOrder: Int = 0,
     val createdAt: Long = System.currentTimeMillis()
 )

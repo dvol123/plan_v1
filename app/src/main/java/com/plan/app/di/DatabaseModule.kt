@@ -2,6 +2,8 @@ package com.plan.app.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.plan.app.data.local.dao.*
 import com.plan.app.data.local.database.PlanDatabase
 import com.plan.app.data.repository.*
@@ -20,6 +22,13 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
     
+    private val MIGRATION_1_2 = object : Migration(1, 2) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Add originalFileName column to contents table
+            db.execSQL("ALTER TABLE contents ADD COLUMN originalFileName TEXT")
+        }
+    }
+    
     @Provides
     @Singleton
     fun provideDatabase(
@@ -29,7 +38,9 @@ object DatabaseModule {
             context,
             PlanDatabase::class.java,
             "plan_database"
-        ).build()
+        )
+            .addMigrations(MIGRATION_1_2)
+            .build()
     }
     
     @Provides

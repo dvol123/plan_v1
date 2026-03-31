@@ -16,7 +16,7 @@ import com.plan.app.data.local.entity.*
         RegionEntity::class,
         ContentEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
