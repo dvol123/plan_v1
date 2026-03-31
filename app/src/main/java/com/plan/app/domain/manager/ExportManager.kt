@@ -127,7 +127,11 @@ class ExportManager @Inject constructor(
                                 ContentType.PHOTO -> "media/photo_${region.id}_$index.jpg"
                                 ContentType.VIDEO -> "media/video_${region.id}_$index.mp4"
                                 ContentType.TEXT -> content.data
-                                ContentType.FILE -> "media/file_${region.id}_$index"
+                                ContentType.FILE -> {
+                                    val sourceFile = getFileFromUri(content.data)
+                                    val extension = sourceFile?.extension?.ifEmpty { "bin" } ?: "bin"
+                                    "media/file_${region.id}_$index.$extension"
+                                }
                             }
                             
                             contentExportList.add(
@@ -675,6 +679,9 @@ class ExportManager @Inject constructor(
         builder.append(".media-item .media-type{display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;text-transform:uppercase;font-weight:600;}")
         builder.append(".media-type.photo{background:#e8f5e9;color:#2e7d32;}")
         builder.append(".media-type.video{background:#fff3e0;color:#ef6c00;}")
+        builder.append(".media-type.file{background:#e3f2fd;color:#1976d2;}")
+        builder.append(".media-item .file-icon{width:100%;height:150px;display:flex;align-items:center;justify-content:center;background:#f5f5f5;font-size:48px;}")
+        builder.append(".media-item .file-name{padding:8px 12px;font-size:11px;color:#333;word-break:break-all;max-height:40px;overflow:hidden;}")
         // Media viewer (fullscreen in panel 3)
         builder.append(".media-viewer{display:none;flex-direction:column;height:100%;background:#1a1a1a;}")
         builder.append(".media-viewer.active{display:flex;}")
@@ -817,6 +824,7 @@ class ExportManager @Inject constructor(
         builder.append("</div>")
         builder.append("<div class='viewer-content' id='viewerContent'></div>")
         builder.append("<div class='viewer-footer'>")
+        builder.append("<button class='viewer-btn' id='btnDownload' onclick='downloadCurrentMedia()' style='margin-right:16px;'>${t.download}</button>")
         builder.append("<div class='zoom-controls'>")
         builder.append("<button class='zoom-btn' onclick='zoomOut()' title='Zoom Out'>${t.zoomOut}</button>")
         builder.append("<span class='zoom-level' id='zoomLevel'>100%</span>")
@@ -939,9 +947,13 @@ class ExportManager @Inject constructor(
         builder.append("let html='<div class=\\'media-grid\\'>';")
         builder.append("currentMediaList.forEach(function(item,index){")
         builder.append("if(item.type==='photo'){")
-        builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><img src=\\''+item.path+'\\' alt=\\'Photo\\' loading=\\'lazy\\'><div class=\\'media-caption\\'><span class=\\'media-type photo\\'>Photo</span></div></div>';")
+        builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><img src=\\''+item.path+'\\' alt=\\'Photo\\' loading=\\'lazy\\'><div class=\\'media-caption\\'><span class=\\'media-type photo\\'>${t.photo}</span></div></div>';")
         builder.append("}else if(item.type==='video'){")
-        builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><video src=\\''+item.path+'\\' preload=\\'metadata\\' muted></video><div class=\\'media-caption\\'><span class=\\'media-type video\\'>Video</span></div></div>';")
+        builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><video src=\\''+item.path+'\\' preload=\\'metadata\\' muted></video><div class=\\'media-caption\\'><span class=\\'media-type video\\'>${t.video}</span></div></div>';")
+        builder.append("}else if(item.type==='file'){")
+        builder.append("const fileName=item.path.split('/').pop();")
+        builder.append("const fileExt=fileName.split('.').pop().toUpperCase();")
+        builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><div class=\\'file-icon\\'>📄</div><div class=\\'file-name\\'>'+fileName+'</div><div class=\\'media-caption\\'><span class=\\'media-type file\\'>'+fileExt+'</span></div></div>';")
         builder.append("}")
         builder.append("});")
         builder.append("html+='</div>';")
@@ -973,13 +985,28 @@ class ExportManager @Inject constructor(
         builder.append("const viewerContent=document.getElementById('viewerContent');")
         builder.append("const viewerTitle=document.getElementById('viewerTitle');")
         builder.append("const viewerCounter=document.getElementById('viewerCounter');")
+        builder.append("const zoomControls=document.querySelector('.zoom-controls');")
         builder.append("viewerCounter.textContent=(currentMediaIndex+1)+' / '+currentMediaList.length;")
         builder.append("if(item.type==='photo'){")
         builder.append("viewerContent.innerHTML='<img src=\\''+item.path+'\\' alt=\\'Photo\\'>';")
-        builder.append("viewerTitle.textContent='Photo - '+(currentRegion?currentRegion.name:'Project');")
+        builder.append("viewerTitle.textContent='${t.photo} - '+(currentRegion?currentRegion.name:'Project');")
+        builder.append("if(zoomControls)zoomControls.style.display='flex';")
         builder.append("}else if(item.type==='video'){")
         builder.append("viewerContent.innerHTML='<video controls autoplay><source src=\\''+item.path+'\\' type=\\'video/mp4\\'>Your browser does not support video.</video>';")
-        builder.append("viewerTitle.textContent='Video - '+(currentRegion?currentRegion.name:'Project');")
+        builder.append("viewerTitle.textContent='${t.video} - '+(currentRegion?currentRegion.name:'Project');")
+        builder.append("if(zoomControls)zoomControls.style.display='none';")
+        builder.append("}else if(item.type==='file'){")
+        builder.append("const fileName=item.path.split('/').pop();")
+        builder.append("const fileExt=fileName.split('.').pop().toLowerCase();")
+        builder.append("const viewableExts=['pdf','jpg','jpeg','png','gif','webp','svg','html','htm','txt','json','xml'];")
+        builder.append("const canPreview=viewableExts.includes(fileExt);")
+        builder.append("if(canPreview){")
+        builder.append("viewerContent.innerHTML='<iframe src=\\''+item.path+'\\' style=\\'width:100%;height:100%;border:none;\\'></iframe>';")
+        builder.append("}else{")
+        builder.append("viewerContent.innerHTML='<div style=\\'text-align:center;color:#fff;padding:40px;\\'><div style=\\'font-size:64px;margin-bottom:20px;\\'>📄</div><div style=\\'font-size:18px;margin-bottom:10px;\\'>'+fileName+'</div><div style=\\'color:#aaa;\\'>${t.cannotPreview}</div></div>';")
+        builder.append("}")
+        builder.append("viewerTitle.textContent='${t.file} - '+fileName;")
+        builder.append("if(zoomControls)zoomControls.style.display='none';")
         builder.append("}")
         builder.append("document.getElementById('btnPrev').disabled=currentMediaIndex===0;")
         builder.append("document.getElementById('btnNext').disabled=currentMediaIndex===currentMediaList.length-1;")
@@ -1027,6 +1054,17 @@ class ExportManager @Inject constructor(
         builder.append("if(currentZoom>minZoom){currentZoom=Math.max(minZoom,currentZoom-zoomStep);updateZoom();}")
         builder.append("}")
         builder.append("function resetZoom(){currentZoom=1;updateZoom();}")
+        // Download current media
+        builder.append("function downloadCurrentMedia(){")
+        builder.append("if(currentMediaList.length===0)return;")
+        builder.append("const item=currentMediaList[currentMediaIndex];")
+        builder.append("const link=document.createElement('a');")
+        builder.append("link.href=item.path;")
+        builder.append("link.download=item.path.split('/').pop();")
+        builder.append("document.body.appendChild(link);")
+        builder.append("link.click();")
+        builder.append("document.body.removeChild(link);")
+        builder.append("}")
         // Keyboard navigation
         builder.append("document.addEventListener('keydown',function(e){")
         builder.append("if(!document.getElementById('mediaViewer').classList.contains('active'))return;")
@@ -1630,6 +1668,7 @@ class ExportManager @Inject constructor(
         // Media
         val photo: String,
         val video: String,
+        val file: String,
         val items: String,
         val item: String,
         // Viewer
@@ -1651,6 +1690,11 @@ class ExportManager @Inject constructor(
         val zoomIn: String,
         val zoomOut: String,
         val resetZoom: String,
+        // Download
+        val download: String,
+        val downloadFile: String,
+        val openInNewTab: String,
+        val cannotPreview: String,
         // Search result types
         val projectType: String,
         val regionType: String
@@ -1674,6 +1718,7 @@ class ExportManager @Inject constructor(
                         viewPhotoWithAreas = "📷 Фото с областями",
                         photo = "Фото",
                         video = "Видео",
+                        file = "Файл",
                         items = "элементов",
                         item = "элемент",
                         prev = "◀ Назад",
@@ -1690,6 +1735,10 @@ class ExportManager @Inject constructor(
                         zoomIn = "🔍+",
                         zoomOut = "🔍-",
                         resetZoom = "↺ Сброс",
+                        download = "⬇ Скачать",
+                        downloadFile = "Скачать файл",
+                        openInNewTab = "Открыть в новой вкладке",
+                        cannotPreview = "Скачайте файл и откройте соответствующей программой",
                         projectType = "проект",
                         regionType = "область"
                     )
@@ -1709,6 +1758,7 @@ class ExportManager @Inject constructor(
                         viewPhotoWithAreas = "📷 查看带区域的照片",
                         photo = "照片",
                         video = "视频",
+                        file = "文件",
                         items = "项",
                         item = "项",
                         prev = "◀ 上一个",
@@ -1725,6 +1775,10 @@ class ExportManager @Inject constructor(
                         zoomIn = "🔍+",
                         zoomOut = "🔍-",
                         resetZoom = "↺ 重置",
+                        download = "⬇ 下载",
+                        downloadFile = "下载文件",
+                        openInNewTab = "在新标签页中打开",
+                        cannotPreview = "请下载文件并使用相应程序打开",
                         projectType = "项目",
                         regionType = "区域"
                     )
@@ -1744,6 +1798,7 @@ class ExportManager @Inject constructor(
                         viewPhotoWithAreas = "📷 View photo with areas",
                         photo = "Photo",
                         video = "Video",
+                        file = "File",
                         items = "items",
                         item = "item",
                         prev = "◀ Prev",
@@ -1760,6 +1815,10 @@ class ExportManager @Inject constructor(
                         zoomIn = "🔍+",
                         zoomOut = "🔍-",
                         resetZoom = "↺ Reset",
+                        download = "⬇ Download",
+                        downloadFile = "Download File",
+                        openInNewTab = "Open in New Tab",
+                        cannotPreview = "Download the file and open with appropriate program",
                         projectType = "project",
                         regionType = "region"
                     )
@@ -1846,6 +1905,9 @@ class ExportManager @Inject constructor(
         builder.append(".media-item .media-type{display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;text-transform:uppercase;font-weight:600;}")
         builder.append(".media-type.photo{background:#e8f5e9;color:#2e7d32;}")
         builder.append(".media-type.video{background:#fff3e0;color:#ef6c00;}")
+        builder.append(".media-type.file{background:#e3f2fd;color:#1976d2;}")
+        builder.append(".media-item .file-icon{width:100%;height:150px;display:flex;align-items:center;justify-content:center;background:#f5f5f5;font-size:48px;}")
+        builder.append(".media-item .file-name{padding:8px 12px;font-size:11px;color:#333;word-break:break-all;max-height:40px;overflow:hidden;}")
         // Media viewer
         builder.append(".media-viewer{display:none;flex-direction:column;height:100%;background:#1a1a1a;}")
         builder.append(".media-viewer.active{display:flex;}")
@@ -1969,6 +2031,7 @@ class ExportManager @Inject constructor(
         builder.append("</div>")
         builder.append("<div class='viewer-content' id='viewerContent'></div>")
         builder.append("<div class='viewer-footer'>")
+        builder.append("<button class='viewer-btn' id='btnDownload' onclick='downloadCurrentMedia()' style='margin-right:16px;'>${t.download}</button>")
         builder.append("<div class='zoom-controls'>")
         builder.append("<button class='zoom-btn' onclick='zoomOut()' title='Zoom Out'>${t.zoomOut}</button>")
         builder.append("<span class='zoom-level' id='zoomLevel'>100%</span>")
@@ -2040,14 +2103,16 @@ class ExportManager @Inject constructor(
         builder.append("regions:'${escapeJs(t.regions)}',")
         builder.append("photo:'${escapeJs(t.photo)}',")
         builder.append("video:'${escapeJs(t.video)}',")
+        builder.append("file:'${escapeJs(t.file)}',")
         builder.append("item:'${escapeJs(t.item)}',")
         builder.append("items:'${escapeJs(t.items)}',")
         builder.append("noMediaForRegion:'${escapeJs(t.noMediaForRegion)}',")
         builder.append("noPhotoAvailable:'${escapeJs(t.noPhotoAvailable)}',")
         builder.append("viewPhotoWithAreas:'${escapeJs(t.viewPhotoWithAreas)}',")
-        builder.append("noResultsFound:'${escapeJs(t.noResultsFound)}',")
+        builder.append("cannotPreview:'${escapeJs(t.cannotPreview)}',")
         builder.append("projectType:'${escapeJs(t.projectType)}',")
-        builder.append("regionType:'${escapeJs(t.regionType)}'")
+        builder.append("regionType:'${escapeJs(t.regionType)}',")
+        builder.append("noResultsFound:'${escapeJs(t.noResultsFound)}'")
         builder.append("};")
         // Update total count
         builder.append("(function(){")
@@ -2177,6 +2242,10 @@ class ExportManager @Inject constructor(
         builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><img src=\\''+item.path+'\\' alt=\\'Photo\\' loading=\\'lazy\\'><div class=\\'media-caption\\'><span class=\\'media-type photo\\'>'+i18n.photo+'</span></div></div>';")
         builder.append("}else if(item.type==='video'){")
         builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><video src=\\''+item.path+'\\' preload=\\'metadata\\' muted></video><div class=\\'media-caption\\'><span class=\\'media-type video\\'>'+i18n.video+'</span></div></div>';")
+        builder.append("}else if(item.type==='file'){")
+        builder.append("const fileName=item.path.split('/').pop();")
+        builder.append("const fileExt=fileName.split('.').pop().toUpperCase();")
+        builder.append("html+='<div class=\\'media-item\\' onclick=\\'openMediaItem('+index+')\\'><div class=\\'file-icon\\'>📄</div><div class=\\'file-name\\'>'+fileName+'</div><div class=\\'media-caption\\'><span class=\\'media-type file\\'>'+fileExt+'</span></div></div>';")
         builder.append("}")
         builder.append("});")
         builder.append("html+='</div>';")
@@ -2202,15 +2271,30 @@ class ExportManager @Inject constructor(
         builder.append("const viewerContent=document.getElementById('viewerContent');")
         builder.append("const viewerTitle=document.getElementById('viewerTitle');")
         builder.append("const viewerCounter=document.getElementById('viewerCounter');")
+        builder.append("const zoomControls=document.querySelector('.zoom-controls');")
         builder.append("viewerCounter.textContent=(currentMediaIndex+1)+' / '+currentMediaList.length;")
         builder.append("const p=projectsData[currentProjectIndex];")
         builder.append("const r=p&&currentRegionIndex>=0?p.regions[currentRegionIndex]:null;")
         builder.append("if(item.type==='photo'){")
         builder.append("viewerContent.innerHTML='<img src=\\''+item.path+'\\' alt=\\'Photo\\' id=\\'viewerImg\\'>';")
         builder.append("viewerTitle.textContent=i18n.photo+' - '+(r?r.name:p?p.name:'Project');")
+        builder.append("if(zoomControls)zoomControls.style.display='flex';")
         builder.append("}else if(item.type==='video'){")
         builder.append("viewerContent.innerHTML='<video controls autoplay><source src=\\''+item.path+'\\' type=\\'video/mp4\\'>Your browser does not support video.</video>';")
         builder.append("viewerTitle.textContent=i18n.video+' - '+(r?r.name:p?p.name:'Project');")
+        builder.append("if(zoomControls)zoomControls.style.display='none';")
+        builder.append("}else if(item.type==='file'){")
+        builder.append("const fileName=item.path.split('/').pop();")
+        builder.append("const fileExt=fileName.split('.').pop().toLowerCase();")
+        builder.append("const viewableExts=['pdf','jpg','jpeg','png','gif','webp','svg','html','htm','txt','json','xml'];")
+        builder.append("const canPreview=viewableExts.includes(fileExt);")
+        builder.append("if(canPreview){")
+        builder.append("viewerContent.innerHTML='<iframe src=\\''+item.path+'\\' style=\\'width:100%;height:100%;border:none;\\'></iframe>';")
+        builder.append("}else{")
+        builder.append("viewerContent.innerHTML='<div style=\\'text-align:center;color:#fff;padding:40px;\\'><div style=\\'font-size:64px;margin-bottom:20px;\\'>📄</div><div style=\\'font-size:18px;margin-bottom:10px;\\'>'+fileName+'</div><div style=\\'color:#aaa;\\'>'+i18n.cannotPreview+'</div></div>';")
+        builder.append("}")
+        builder.append("viewerTitle.textContent=i18n.file+' - '+fileName;")
+        builder.append("if(zoomControls)zoomControls.style.display='none';")
         builder.append("}")
         builder.append("document.getElementById('btnPrev').disabled=currentMediaIndex===0;")
         builder.append("document.getElementById('btnNext').disabled=currentMediaIndex===currentMediaList.length-1;")
@@ -2239,6 +2323,17 @@ class ExportManager @Inject constructor(
         builder.append("if(currentZoom>minZoom){currentZoom=Math.max(minZoom,currentZoom-zoomStep);updateZoom();}")
         builder.append("}")
         builder.append("function resetZoom(){currentZoom=1;updateZoom();}")
+        // Download function
+        builder.append("function downloadCurrentMedia(){")
+        builder.append("if(currentMediaList.length===0)return;")
+        builder.append("const item=currentMediaList[currentMediaIndex];")
+        builder.append("const link=document.createElement('a');")
+        builder.append("link.href=item.path;")
+        builder.append("link.download=item.path.split('/').pop();")
+        builder.append("document.body.appendChild(link);")
+        builder.append("link.click();")
+        builder.append("document.body.removeChild(link);")
+        builder.append("}")
         builder.append("document.addEventListener('keydown',function(e){")
         builder.append("if(!document.getElementById('mediaViewer').classList.contains('active'))return;")
         builder.append("if(e.key==='ArrowLeft')navigateMedia(-1);")
